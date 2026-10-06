@@ -21,6 +21,7 @@ export function evaluateRouteAccess(input: RouteDecisionInput): RouteDecisionRes
 
   const isDashboardRoute =
     pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/admin") ||
     pathname.startsWith("/campaigns") ||
     pathname.startsWith("/contacts") ||
     pathname.startsWith("/calls") ||
@@ -148,6 +149,17 @@ export function runRouteProtectionTests() {
     throw new Error(`Expected redirect to /dashboard, got: ${JSON.stringify(r7)}`);
   }
   console.log("  ✅ Test 7: Authenticated user visiting /login redirected to /dashboard");
+
+  // 8. Unauthenticated visiting /admin
+  const r8 = evaluateRouteAccess({
+    pathname: "/admin",
+    user: null,
+    hasBusiness: false,
+  });
+  if (r8.action !== "REDIRECT" || !r8.redirectTo?.startsWith("/login")) {
+    throw new Error(`Expected redirect to /login for unauthenticated admin visit, got: ${JSON.stringify(r8)}`);
+  }
+  console.log("  ✅ Test 8: Unauthenticated user on /admin redirected to /login");
 }
 
 if (require.main === module) {

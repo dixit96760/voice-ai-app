@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     const rateLimit = await assertRateLimit(
       `rl:webhook:sarvam:${clientIp}`,
-      120,
-      2
+      600,
+      10
     );
     if (!rateLimit.allowed) {
       return NextResponse.json(

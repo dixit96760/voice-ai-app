@@ -191,10 +191,16 @@ export function getWebhookToken(): string | null {
  * is carried in the registered URL. Returns the URL to register with Sarvam.
  */
 export function buildCampaignWebhookUrl(): string {
-  const appUrl = (readEnv("NEXT_PUBLIC_APP_URL") || "http://localhost:3000").replace(
-    /\/+$/,
-    ""
-  );
+  let appUrl = readEnv("NEXT_PUBLIC_APP_URL");
+  if (!appUrl && process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    appUrl = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  } else if (!appUrl && process.env.VERCEL_URL) {
+    appUrl = `https://${process.env.VERCEL_URL}`;
+  }
+  if (!appUrl) {
+    appUrl = "http://localhost:3000";
+  }
+  appUrl = appUrl.replace(/\/+$/, "");
   const url = new URL(`${appUrl}${SARVAM_WEBHOOK_PATH}`);
   const token = getWebhookToken();
   if (token) url.searchParams.set("token", token);
