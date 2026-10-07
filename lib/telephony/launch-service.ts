@@ -52,7 +52,7 @@ export async function launchCampaignExecution(
     return { success: false, error: "Campaign not found or unauthorized." };
   }
 
-  if (campaign.status !== "READY" && campaign.status !== "DRAFT") {
+  if (campaign.status !== "READY") {
     return {
       success: false,
       error: `Campaign cannot be launched from current status: ${campaign.status}. Must be READY.`,
@@ -163,7 +163,28 @@ export async function launchCampaignExecution(
     };
   }
 
-  // 8. Filter out DNC & Wrong Numbers
+  // 8. Filter out DNC & Wrong Numbers. The business DNC list is checked as
+  //    well as the contact flag, so an opted-out number stays blocked even if
+  //    it was re-imported or exists under another contact record.
+  const { data: dncRecords, error: dncError } = await supabase
+    .from("dnc_numbers")
+    .select("phone_number")
+    .eq("business_id", businessId);
+
+  if (dncError) {
+    return {
+      success: false,
+      error: "Could not load the Do-Not-Call list. Launch aborted to avoid calling opted-out numbers.",
+    };
+  }
+
+  const dncPhones = new Set<string>();
+  for (const r of dncRecords || []) {
+    dncPhones.add(r.phone_number);
+    const p = normalizeIndianPhone(r.phone_number);
+    if (p.isValid && p.normalized) dncPhones.add(p.normalized);
+  }
+
   let excludedDncCount = 0;
   const eligibleContacts: Contact[] = [];
 
@@ -174,6 +195,10 @@ export async function launchCampaignExecution(
     }
     const p = normalizeIndianPhone(c.phone);
     if (!p.isValid || !p.normalized) {
+      excludedDncCount++;
+      continue;
+    }
+    if (dncPhones.has(c.phone) || dncPhones.has(p.normalized)) {
       excludedDncCount++;
       continue;
     }

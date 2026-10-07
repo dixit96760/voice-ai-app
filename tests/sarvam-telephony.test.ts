@@ -488,7 +488,7 @@ export function runSarvamTelephonyTests() {
   if (webhookSource.includes('import { createClient } from "@/lib/supabase/server";')) {
     throw new Error("webhook-service.ts must NOT import createClient from '@/lib/supabase/server'");
   }
-  if (!webhookSource.includes("const supabase = createAdminClient();")) {
+  if (!webhookSource.includes("const supabase = client ?? createAdminClient();")) {
     throw new Error("webhook-service.ts must initialize supabase with createAdminClient()");
   }
   console.log("  ✅ Webhook ingestion verified to use admin/service-role client bypassing RLS");

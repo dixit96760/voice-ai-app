@@ -8,6 +8,7 @@ import {
   campaignAiBehaviorSchema,
   campaignCallingRulesSchema,
   CampaignReadinessResult,
+  CAMPAIGN_TIMEZONE,
 } from "@/lib/validation/campaign";
 import { validateCampaignReadiness } from "./validator";
 import { redirect } from "next/navigation";
@@ -68,7 +69,7 @@ export async function createCampaignDraftAction(
       objective: validation.data.objective,
       description: validation.data.description,
       status: "DRAFT",
-      timezone: business.timezone || "Asia/Kolkata",
+      timezone: CAMPAIGN_TIMEZONE,
       calling_days: [1, 2, 3, 4, 5, 6],
       calling_start_time: "10:00:00",
       calling_end_time: "18:30:00",
@@ -445,7 +446,7 @@ export async function updateCallingRulesAction(
     callingDays: callingDaysRaw.length > 0 ? callingDaysRaw : [1, 2, 3, 4, 5, 6],
     callingStartTime: (formData.get("callingStartTime") as string) || "10:00",
     callingEndTime: (formData.get("callingEndTime") as string) || "18:30",
-    timezone: (formData.get("timezone") as string) || business.timezone || "Asia/Kolkata",
+    timezone: CAMPAIGN_TIMEZONE,
     maxAttempts: Number(formData.get("maxAttempts")) || 3,
     retryIntervalMinutes: Number(formData.get("retryIntervalMinutes")) || 60,
     maxCallDurationSeconds: Number(formData.get("maxCallDurationSeconds")) || 300,

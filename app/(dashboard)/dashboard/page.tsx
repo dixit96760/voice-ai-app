@@ -412,6 +412,7 @@ export default async function DashboardPage() {
                       <span className="font-semibold text-blue-950">{contact?.name || "Lead"}</span>
                       <span className="text-[10px] font-mono text-blue-700 font-semibold">
                         {new Date(cb.scheduled_for).toLocaleTimeString("en-IN", {
+                          timeZone: "Asia/Kolkata",
                           hour: "2-digit",
                           minute: "2-digit",
                         })}

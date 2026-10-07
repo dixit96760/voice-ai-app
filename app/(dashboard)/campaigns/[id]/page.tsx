@@ -202,7 +202,7 @@ export default async function CampaignDetailPage({
           <AlertTitle>This campaign is in the Recycle Bin</AlertTitle>
           <AlertDescription>
             It was soft-deleted on{" "}
-            {new Date(campaign.deleted_at!).toLocaleDateString("en-IN")}. It will
+            {new Date(campaign.deleted_at!).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}. It will
             be permanently removed after 30 days unless restored.
           </AlertDescription>
         </Alert>
@@ -245,6 +245,7 @@ export default async function CampaignDetailPage({
             <span>
               <strong>Last Updated:</strong>{" "}
               {new Date(campaign.updated_at).toLocaleDateString("en-IN", {
+                timeZone: "Asia/Kolkata",
                 day: "numeric",
                 month: "short",
                 year: "numeric",
@@ -347,6 +348,7 @@ export default async function CampaignDetailPage({
                         <TableCell className="text-right text-muted-foreground text-[11px]">
                           {call.ended_at
                             ? new Date(call.ended_at).toLocaleTimeString("en-IN", {
+                                timeZone: "Asia/Kolkata",
                                 hour: "2-digit",
                                 minute: "2-digit",
                               })
@@ -658,7 +660,7 @@ export default async function CampaignDetailPage({
                         </p>
                         <p className="text-[11px] text-muted-foreground">
                           Type: {source.source_type} • Added on{" "}
-                          {new Date(source.created_at).toLocaleDateString("en-IN")}
+                          {new Date(source.created_at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
                           {source.raw_text && ` • ${source.raw_text.length} chars`}
                         </p>
                       </div>
@@ -808,9 +810,9 @@ export default async function CampaignDetailPage({
                       </Badge>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Created: {new Date(ver.created_at).toLocaleString("en-IN")}
+                      Created: {new Date(ver.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
                       {ver.published_at &&
-                        ` • Published: ${new Date(ver.published_at).toLocaleString("en-IN")}`}
+                        ` • Published: ${new Date(ver.published_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`}
                     </p>
                   </div>
                   <span className="font-mono text-[11px] text-muted-foreground">

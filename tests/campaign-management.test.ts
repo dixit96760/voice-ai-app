@@ -201,7 +201,41 @@ export function runCampaignManagementTests() {
   if (invalidRetry.success) {
     throw new Error("Retry gap < 15 minutes should have failed");
   }
-  console.log("  ✅ Aggressive retry interval (<15m) rejected\n");
+  console.log("  ✅ Aggressive retry interval (<15m) rejected");
+
+  const tooEarly = campaignCallingRulesSchema.safeParse({
+    callingStartTime: "08:30",
+    callingEndTime: "18:00",
+    callingDays: [1, 2, 3],
+  });
+  const tooLate = campaignCallingRulesSchema.safeParse({
+    callingStartTime: "10:00",
+    callingEndTime: "21:30",
+    callingDays: [1, 2, 3],
+  });
+  if (tooEarly.success || tooLate.success) {
+    throw new Error("Calling windows outside 09:00-21:00 IST should have failed");
+  }
+  const fullPermittedWindow = campaignCallingRulesSchema.safeParse({
+    callingStartTime: "09:00",
+    callingEndTime: "21:00",
+    callingDays: [1, 2, 3],
+  });
+  if (!fullPermittedWindow.success) {
+    throw new Error("The full 09:00-21:00 window should be accepted");
+  }
+  console.log("  ✅ TRAI calling window enforced (09:00-21:00 IST accepted, outside rejected)");
+
+  const foreignTimezone = campaignCallingRulesSchema.safeParse({
+    callingStartTime: "10:00",
+    callingEndTime: "18:00",
+    callingDays: [1, 2, 3],
+    timezone: "America/New_York",
+  });
+  if (foreignTimezone.success) {
+    throw new Error("Non-IST campaign timezone should have failed");
+  }
+  console.log("  ✅ Non-IST campaign timezone rejected\n");
 
   // -------------------------------------------------------------
   // 5. Pre-flight Readiness Validator Tests
@@ -263,7 +297,22 @@ export function runCampaignManagementTests() {
   if (!crossBusinessResult.errors.some((e) => e.code === "INVALID_OWNERSHIP")) {
     throw new Error("Expected INVALID_OWNERSHIP error code");
   }
-  console.log("  ✅ Cross-business isolation enforced (INVALID_OWNERSHIP)\n");
+  console.log("  ✅ Cross-business isolation enforced (INVALID_OWNERSHIP)");
+
+  // Scenario E: Legacy campaign saved with a window outside permitted hours
+  const lateNightResult = validateCampaignReadiness({
+    campaign: { ...validCampaign, calling_start_time: "10:00:00", calling_end_time: "22:00:00" },
+    sources: [validSource],
+    contactCount: 50,
+    businessId,
+  });
+  if (
+    lateNightResult.ready ||
+    !lateNightResult.errors.some((e) => e.code === "CALLING_WINDOW_OUTSIDE_PERMITTED_HOURS")
+  ) {
+    throw new Error("Campaign calling after 21:00 IST must NOT be ready");
+  }
+  console.log("  ✅ Calling window outside 09:00-21:00 IST blocks READY state\n");
 
   // -------------------------------------------------------------
   // 6. Campaign Duplication & Lifecycle Invariant Tests

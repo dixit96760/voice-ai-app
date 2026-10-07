@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { requireBusiness } from "@/lib/auth/session";
+import { getAuthContext } from "@/lib/auth/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { listCalls, getCallDetail, ListCallsFilters, CallDetailResult, CallListItem } from "./call-service";
 import { getCallRecordingSignedUrl } from "./recording-service";
 
@@ -71,6 +73,11 @@ export async function updateCallbackStatusAction(
   try {
     const { supabase, business } = await getAuthenticatedBusiness();
 
+    const context = await getAuthContext();
+    if (!context || !hasPermission(context.role, "calls:write")) {
+      return { success: false, error: "Insufficient permissions." };
+    }
+
     const { error } = await supabase
       .from("callbacks")
       .update({
@@ -85,6 +92,7 @@ export async function updateCallbackStatusAction(
       return { success: false, error: error.message };
     }
 
+    revalidatePath("/callbacks");
     revalidatePath("/calls");
     revalidatePath("/dashboard");
     return { success: true };

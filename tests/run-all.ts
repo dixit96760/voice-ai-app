@@ -5,6 +5,7 @@ import { runOAuthCallbackTests } from "./oauth-callback.test";
 import { runBusinessOnboardingTests } from "./business-onboarding.test";
 import { runCampaignManagementTests } from "./campaign-management.test";
 import { runSarvamTelephonyTests } from "./sarvam-telephony.test";
+import { runSarvamWebhookIdempotencyTests } from "./sarvam-webhook-idempotency.test";
 import { runOperationalLayerTests } from "./operational-layer.test";
 import { runBillingSubscriptionTests } from "./billing-subscriptions.test";
 import { runAuthSecurityTests } from "./auth-security.test";
@@ -66,6 +67,9 @@ async function runAllTests() {
 
   // 8. Sarvam Voice Agents & Outbound Telephony (Phase 4)
   runSarvamTelephonyTests();
+  console.log("");
+
+  await runSarvamWebhookIdempotencyTests();
   console.log("");
 
   // 9. Operational Product Layer (Phase 5)

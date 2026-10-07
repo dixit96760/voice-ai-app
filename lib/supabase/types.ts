@@ -433,7 +433,7 @@ export type Database = {
         Row: {
           attempt_number: number
           call_id: string | null
-          campaign_contact_id: string
+          campaign_contact_id: string | null
           created_at: string
           duration_seconds: number
           ended_at: string | null
@@ -448,7 +448,7 @@ export type Database = {
         Insert: {
           attempt_number: number
           call_id?: string | null
-          campaign_contact_id: string
+          campaign_contact_id?: string | null
           created_at?: string
           duration_seconds?: number
           ended_at?: string | null
@@ -463,7 +463,7 @@ export type Database = {
         Update: {
           attempt_number?: number
           call_id?: string | null
-          campaign_contact_id?: string
+          campaign_contact_id?: string | null
           created_at?: string
           duration_seconds?: number
           ended_at?: string | null
@@ -2112,6 +2112,7 @@ export type Database = {
           processed: boolean
           processed_at: string | null
           processing_error: string | null
+          processing_started_at: string | null
           provider: string
           provider_event_created_at: string | null
           provider_event_id: string | null
@@ -2129,6 +2130,7 @@ export type Database = {
           processed?: boolean
           processed_at?: string | null
           processing_error?: string | null
+          processing_started_at?: string | null
           provider?: string
           provider_event_created_at?: string | null
           provider_event_id?: string | null
@@ -2146,6 +2148,7 @@ export type Database = {
           processed?: boolean
           processed_at?: string | null
           processing_error?: string | null
+          processing_started_at?: string | null
           provider?: string
           provider_event_created_at?: string | null
           provider_event_id?: string | null

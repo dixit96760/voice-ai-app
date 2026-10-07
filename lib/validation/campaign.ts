@@ -125,6 +125,26 @@ export const campaignAiBehaviorSchema = z.object({
 
 export type CampaignAiBehaviorInput = z.infer<typeof campaignAiBehaviorSchema>;
 
+/**
+ * TRAI permits commercial calls only between 09:00 and 21:00 IST. Campaign
+ * windows must sit inside this range; Sarvam then enforces the window per dial.
+ */
+export const PERMITTED_CALLING_START = "09:00";
+export const PERMITTED_CALLING_END = "21:00";
+export const CAMPAIGN_TIMEZONE = "Asia/Kolkata";
+
+export function toMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+export function isWithinPermittedCallingHours(start: string, end: string): boolean {
+  return (
+    toMinutes(start) >= toMinutes(PERMITTED_CALLING_START) &&
+    toMinutes(end) <= toMinutes(PERMITTED_CALLING_END)
+  );
+}
+
 export const campaignCallingRulesSchema = z
   .object({
     callingDays: z
@@ -136,7 +156,11 @@ export const campaignCallingRulesSchema = z
     callingEndTime: z
       .string()
       .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "End time must be HH:MM (e.g. 18:30)"),
-    timezone: z.string().default("Asia/Kolkata"),
+    timezone: z
+      .literal(CAMPAIGN_TIMEZONE, {
+        error: "Campaigns call Indian numbers and must use the Asia/Kolkata timezone",
+      })
+      .default(CAMPAIGN_TIMEZONE),
     maxAttempts: z
       .number()
       .int()
@@ -157,16 +181,17 @@ export const campaignCallingRulesSchema = z
       .default(300),
   })
   .refine(
-    (data) => {
-      const [startH, startM] = data.callingStartTime.split(":").map(Number);
-      const [endH, endM] = data.callingEndTime.split(":").map(Number);
-      const startMinutes = startH * 60 + startM;
-      const endMinutes = endH * 60 + endM;
-      return endMinutes > startMinutes;
-    },
+    (data) => toMinutes(data.callingEndTime) > toMinutes(data.callingStartTime),
     {
       message: "Calling end time must be after start time",
       path: ["callingEndTime"],
+    }
+  )
+  .refine(
+    (data) => isWithinPermittedCallingHours(data.callingStartTime, data.callingEndTime),
+    {
+      message: `Calls are only permitted between ${PERMITTED_CALLING_START} and ${PERMITTED_CALLING_END} IST`,
+      path: ["callingStartTime"],
     }
   );
 

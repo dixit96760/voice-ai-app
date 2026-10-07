@@ -985,6 +985,8 @@ export default function CampaignWizard({
                     id="callingStartTime"
                     name="callingStartTime"
                     type="time"
+                    min="09:00"
+                    max="21:00"
                     defaultValue={campaign.calling_start_time?.slice(0, 5) || "10:00"}
                     required
                   />
@@ -996,6 +998,8 @@ export default function CampaignWizard({
                     id="callingEndTime"
                     name="callingEndTime"
                     type="time"
+                    min="09:00"
+                    max="21:00"
                     defaultValue={campaign.calling_end_time?.slice(0, 5) || "18:30"}
                     required
                   />

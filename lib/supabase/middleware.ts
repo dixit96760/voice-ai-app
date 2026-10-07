@@ -109,9 +109,11 @@ export async function updateSession(request: NextRequest) {
       request.headers.get("authorization")?.toLowerCase().startsWith("bearer sv_live_")
   );
 
-  // API-key principals are authenticated by the route-level verifier, which
-  // checks the hash, expiry, revocation, and organization scope.
-  if (isApiRoute && hasApiKey && !pathname.startsWith("/api/auth/")) {
+  // API-key principals are authenticated by the route-level verifier
+  // (authenticateApiKeyRequest), which checks the hash, expiry, revocation,
+  // and organization scope. Only the public developer API under /api/v1/ is
+  // key-authenticated; every other API route requires a session.
+  if (pathname.startsWith("/api/v1/") && hasApiKey) {
     return response;
   }
 

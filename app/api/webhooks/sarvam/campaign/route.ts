@@ -82,9 +82,11 @@ export async function POST(req: NextRequest) {
 
     if (!result.success) {
       console.error("Webhook processing error:", result.error);
+      // A non-2xx status asks Sarvam to redeliver; permanent failures (such as
+      // an unknown campaign) are acknowledged so they are not retried forever.
       return NextResponse.json(
         { received: true, status: "error", error: result.error },
-        { status: 200 }
+        { status: result.retryable ? 503 : 200 }
       );
     }
 

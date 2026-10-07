@@ -1,6 +1,10 @@
 import {
   CampaignReadinessResult,
   CampaignValidationError,
+  PERMITTED_CALLING_END,
+  PERMITTED_CALLING_START,
+  isWithinPermittedCallingHours,
+  toMinutes,
 } from "@/lib/validation/campaign";
 import type { Campaign, CampaignSource } from "@/lib/campaign/types";
 
@@ -104,13 +108,19 @@ export function validateCampaignReadiness(
       message: "Calling start and end times are required.",
     });
   } else {
-    const [sH, sM] = campaign.calling_start_time.split(":").map(Number);
-    const [eH, eM] = campaign.calling_end_time.split(":").map(Number);
-    if (eH * 60 + eM <= sH * 60 + sM) {
+    const start = campaign.calling_start_time.slice(0, 5);
+    const end = campaign.calling_end_time.slice(0, 5);
+    if (toMinutes(end) <= toMinutes(start)) {
       errors.push({
         section: "calling",
         code: "INVALID_CALLING_WINDOW",
         message: "Calling end time must be after start time.",
+      });
+    } else if (!isWithinPermittedCallingHours(start, end)) {
+      errors.push({
+        section: "calling",
+        code: "CALLING_WINDOW_OUTSIDE_PERMITTED_HOURS",
+        message: `Calls are only permitted between ${PERMITTED_CALLING_START} and ${PERMITTED_CALLING_END} IST.`,
       });
     }
   }

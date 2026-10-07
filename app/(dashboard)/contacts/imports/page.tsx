@@ -122,6 +122,7 @@ export default async function ContactImportsHistoryPage() {
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
                     {new Date(imp.created_at).toLocaleDateString("en-IN", {
+                      timeZone: "Asia/Kolkata",
                       day: "numeric",
                       month: "short",
                       year: "numeric",

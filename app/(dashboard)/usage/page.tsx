@@ -131,6 +131,7 @@ export default async function UsagePage() {
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground font-mono">
                     {new Date(ev.created_at).toLocaleString("en-IN", {
+                      timeZone: "Asia/Kolkata",
                       day: "numeric",
                       month: "short",
                       hour: "2-digit",

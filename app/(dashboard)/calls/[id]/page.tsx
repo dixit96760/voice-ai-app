@@ -130,6 +130,7 @@ export default async function CallDetailPage({ params }: CallDetailPageProps) {
               <p className="font-semibold text-foreground flex items-center gap-1">
                 <Calendar className="h-3.5 w-3.5 text-primary" />
                 {new Date(call.created_at).toLocaleDateString("en-IN", {
+                  timeZone: "Asia/Kolkata",
                   day: "numeric",
                   month: "short",
                   hour: "2-digit",
@@ -187,7 +188,7 @@ export default async function CallDetailPage({ params }: CallDetailPageProps) {
                 Scheduled Callback Request
               </h4>
               <p className="text-[11px] text-blue-700">
-                Target: {new Date(callback.scheduled_for).toLocaleString("en-IN")} • Status: {callback.status}
+                Target: {new Date(callback.scheduled_for).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} • Status: {callback.status}
               </p>
             </div>
           </div>
@@ -302,6 +303,7 @@ export default async function CallDetailPage({ params }: CallDetailPageProps) {
                 <p className="font-mono">{formatDuration(att.duration_seconds)}</p>
                 <p className="text-[10px]">
                   {new Date(att.created_at).toLocaleTimeString("en-IN", {
+                    timeZone: "Asia/Kolkata",
                     hour: "2-digit",
                     minute: "2-digit",
                     second: "2-digit",

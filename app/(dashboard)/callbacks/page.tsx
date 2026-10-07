@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CallbackStatusActions } from "./callback-status-actions";
 
 export default async function CallbacksPage() {
   const business = await getCurrentBusiness();
@@ -42,6 +43,8 @@ export default async function CallbacksPage() {
     .eq("business_id", business.id)
     .order("scheduled_for", { ascending: true });
 
+  const pendingCount = (callbacks || []).filter((cb) => cb.status === "SCHEDULED").length;
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between border-b pb-4">
@@ -55,7 +58,8 @@ export default async function CallbacksPage() {
           </p>
         </div>
         <div className="text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">{callbacks?.length || 0}</span> callback requests
+          <span className="font-semibold text-foreground">{pendingCount}</span> pending of{" "}
+          {callbacks?.length || 0} callback requests
         </div>
       </div>
 
@@ -70,12 +74,13 @@ export default async function CallbacksPage() {
               <TableHead className="font-semibold text-xs">Status</TableHead>
               <TableHead className="font-semibold text-xs">Notes</TableHead>
               <TableHead className="font-semibold text-xs text-right">Source Call</TableHead>
+              <TableHead className="font-semibold text-xs text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {!callbacks || callbacks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground text-sm">
+                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground text-sm">
                   No pending callback requests. When prospects ask for a callback, they will appear here automatically.
                 </TableCell>
               </TableRow>
@@ -103,6 +108,7 @@ export default async function CallbacksPage() {
                     </TableCell>
                     <TableCell className="font-semibold text-primary">
                       {new Date(cb.scheduled_for).toLocaleString("en-IN", {
+                        timeZone: "Asia/Kolkata",
                         day: "numeric",
                         month: "short",
                         hour: "2-digit",
@@ -131,6 +137,9 @@ export default async function CallbacksPage() {
                       ) : (
                         "—"
                       )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <CallbackStatusActions callbackId={cb.id} status={cb.status} />
                     </TableCell>
                   </TableRow>
                 );

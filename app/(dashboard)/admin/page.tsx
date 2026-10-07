@@ -37,6 +37,7 @@ export default async function AdminBackofficePage() {
   const { data: webhookEvents } = await adminSupabase
     .from("webhook_events")
     .select("id, provider, event_type, status, processed, received_at, processing_error")
+    .eq("business_id", context.businessId)
     .order("received_at", { ascending: false })
     .limit(10);
 
@@ -165,6 +166,7 @@ export default async function AdminBackofficePage() {
                   <TableCell>{ev.processed ? "Yes" : "In Flight"}</TableCell>
                   <TableCell className="text-right font-mono text-muted-foreground">
                     {new Date(ev.received_at).toLocaleString("en-IN", {
+                      timeZone: "Asia/Kolkata",
                       day: "2-digit",
                       month: "short",
                       hour: "2-digit",
@@ -217,6 +219,7 @@ export default async function AdminBackofficePage() {
                   </TableCell>
                   <TableCell className="text-right font-mono text-muted-foreground">
                     {new Date(log.created_at).toLocaleString("en-IN", {
+                      timeZone: "Asia/Kolkata",
                       day: "2-digit",
                       month: "short",
                       hour: "2-digit",

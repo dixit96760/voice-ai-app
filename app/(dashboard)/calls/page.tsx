@@ -227,6 +227,7 @@ export default async function CallsPage({ searchParams }: CallsPageProps) {
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground font-mono">
                     {new Date(call.created_at).toLocaleTimeString("en-IN", {
+                      timeZone: "Asia/Kolkata",
                       hour: "2-digit",
                       minute: "2-digit",
                       month: "short",
