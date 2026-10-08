@@ -9,7 +9,7 @@ type Filter = (row: Row) => boolean;
  * Minimal in-memory stand-in for the Supabase query builder, covering the
  * calls the webhook processor makes. Unique constraints mirror the database.
  */
-class FakeDb {
+export class FakeDb {
   tables = new Map<string, Row[]>();
   uniqueKeys: Record<string, string[][]> = {
     webhook_events: [["provider", "provider_event_id"]],
@@ -44,7 +44,7 @@ class FakeDb {
 }
 
 class FakeQuery {
-  private op: "select" | "insert" | "update" | "upsert" = "select";
+  private op: "select" | "insert" | "update" | "upsert" | "delete" = "select";
   private payload: Row[] = [];
   private onConflict: string[] = [];
   private filters: Filter[] = [];
@@ -84,6 +84,34 @@ class FakeQuery {
     this.filters.push((r) => vals.includes(r[col]));
     return this;
   }
+  neq(col: string, val: unknown) {
+    this.filters.push((r) => r[col] !== val);
+    return this;
+  }
+  gte(col: string, val: string | number) {
+    this.filters.push((r) => r[col] !== null && r[col] !== undefined && String(r[col]) >= String(val));
+    return this;
+  }
+  lte(col: string, val: string | number) {
+    this.filters.push((r) => r[col] !== null && r[col] !== undefined && String(r[col]) <= String(val));
+    return this;
+  }
+  lt(col: string, val: string | number) {
+    this.filters.push((r) => {
+      const v = r[col];
+      if (v === null || v === undefined) return false;
+      return typeof val === "number" ? Number(v) < val : String(v) < String(val);
+    });
+    return this;
+  }
+  not(col: string, _op: "is", val: unknown) {
+    this.filters.push((r) => (r[col] ?? null) !== val);
+    return this;
+  }
+  delete() {
+    this.op = "delete";
+    return this;
+  }
   order() {
     return this;
   }
@@ -120,6 +148,12 @@ class FakeQuery {
 
     if (this.op === "select") return this.shape(matches());
 
+    if (this.op === "delete") {
+      const hit = matches();
+      this.db.tables.set(this.table, table.filter((r) => !hit.includes(r)));
+      return this.shape(hit);
+    }
+
     if (this.op === "update") {
       const hit = matches();
       for (const r of hit) Object.assign(r, this.payload[0]);
@@ -146,7 +180,7 @@ class FakeQuery {
           return { data: null, error: { code: "23505", message: "duplicate key" } };
         }
       }
-      const row = { id: this.db.newId(), ...values };
+      const row = { id: this.db.newId(), created_at: new Date().toISOString(), ...values };
       table.push(row);
       written.push(row);
     }

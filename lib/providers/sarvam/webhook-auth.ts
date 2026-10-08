@@ -78,3 +78,13 @@ export function verifySarvamWebhook(
       "Sarvam webhook verification is not configured. Set SARVAM_WEBHOOK_TOKEN (or SARVAM_WEBHOOK_SECRET).",
   };
 }
+
+/**
+ * Verifies a request Sarvam makes on the agent's behalf (an API tool call)
+ * by the shared token in its URL. Tool calls are not HMAC-signed.
+ */
+export function verifySarvamToolToken(urlToken: string | null): boolean {
+  const token = process.env.SARVAM_WEBHOOK_TOKEN?.trim();
+  if (!isUsableSarvamValue(token) || !urlToken) return false;
+  return safeEquals(urlToken, token);
+}

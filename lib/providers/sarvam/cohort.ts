@@ -23,6 +23,8 @@ export interface StreamCohortParams {
   campaignObjective?: string;
   /** Pitch and approved facts the agent should use for this campaign. */
   campaignBrief?: string;
+  /** Our campaign id, streamed so agent tools can identify the call. */
+  campaignId?: string;
   /**
    * Agent variable names to stream. Sarvam rejects cohorts containing
    * variables the agent does not declare, so this is an allow-list.
@@ -81,27 +83,23 @@ function sanitizeCohortName(name: string): string {
   return cleaned || "cohort";
 }
 
-/**
- * Maps a contact to the Sarvam cohort user record.
- * Only allow-listed variables are sent, because Sarvam validates
- * `app_variables` against the agent configuration.
- */
-export function buildCohortUser(
-  contact: Contact,
-  context: {
-    businessName?: string;
-    campaignOffering?: string;
-    campaignObjective?: string;
-    campaignBrief?: string;
-    appVariables: string[];
-  }
-): SarvamCohortUser {
-  const phone = normalizeIndianPhone(contact.phone);
-  if (!phone.isValid || !phone.normalized) {
-    throw new Error(`Contact ${contact.id} has an invalid phone number.`);
-  }
+export interface AgentVariableContext {
+  businessName?: string;
+  campaignOffering?: string;
+  campaignObjective?: string;
+  campaignBrief?: string;
+  campaignId?: string;
+}
 
-  const values: Record<string, string> = {
+/**
+ * Every per-contact value the shared outreach agent can use. Campaign calls
+ * stream an allow-listed subset; instant callback calls send all of them.
+ */
+export function buildAgentVariableValues(
+  contact: Pick<Contact, "id" | "name" | "city">,
+  context: AgentVariableContext
+): Record<string, string> {
+  return {
     customer_name: contact.name || "",
     contact_name: contact.name || "",
     city: contact.city || "",
@@ -109,7 +107,26 @@ export function buildCohortUser(
     offering_type: context.campaignOffering || "",
     campaign_objective: context.campaignObjective || "",
     campaign_brief: context.campaignBrief || "",
+    contact_id: contact.id,
+    campaign_id: context.campaignId || "",
   };
+}
+
+/**
+ * Maps a contact to the Sarvam cohort user record.
+ * Only allow-listed variables are sent, because Sarvam validates
+ * `app_variables` against the agent configuration.
+ */
+export function buildCohortUser(
+  contact: Contact,
+  context: AgentVariableContext & { appVariables: string[] }
+): SarvamCohortUser {
+  const phone = normalizeIndianPhone(contact.phone);
+  if (!phone.isValid || !phone.normalized) {
+    throw new Error(`Contact ${contact.id} has an invalid phone number.`);
+  }
+
+  const values = buildAgentVariableValues(contact, context);
 
   const appVariables: Record<string, string> = {};
   for (const key of context.appVariables) {
@@ -146,6 +163,7 @@ export async function streamSarvamCohort({
   businessName,
   campaignObjective,
   campaignBrief,
+  campaignId,
   appVariables,
 }: StreamCohortParams): Promise<StreamCohortResult> {
   getSarvamScope();
@@ -177,6 +195,7 @@ export async function streamSarvamCohort({
         campaignOffering,
         campaignObjective,
         campaignBrief,
+        campaignId,
         appVariables: allowedVariables,
       })
     );

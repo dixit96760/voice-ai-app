@@ -1,0 +1,172 @@
+import assert from "node:assert/strict";
+import { FakeDb } from "./sarvam-webhook-idempotency.test";
+import { isWithinCallingWindow, purgeRecycleBin } from "../lib/telephony/scheduler";
+import { toCampaignPayload } from "../lib/telephony/outbound-webhook";
+import { buildBusinessDetailsMessage } from "../lib/messaging/business-details";
+import { sendBusinessDetails } from "../lib/messaging/send-business-details";
+
+const BUSINESS_ID = "b0000000-0000-4000-8000-0000000000aa";
+const CAMPAIGN_ID = "c0000000-0000-4000-8000-0000000000aa";
+const CONTACT_ID = "d0000000-0000-4000-8000-0000000000aa";
+
+/** IST wall-clock time as a Date (IST = UTC+05:30). */
+function ist(isoLocal: string): Date {
+  return new Date(`${isoLocal}+05:30`);
+}
+
+function seedMessagingDb(opts: { dnc?: boolean } = {}) {
+  const db = new FakeDb();
+  db.rows("businesses").push({
+    id: BUSINESS_ID,
+    business_name: "Dixit Institutions",
+    description: "Affordable programming courses for students.",
+    website: "https://dixit.example",
+    business_phone: "+919876543210",
+    business_email: null,
+  });
+  db.rows("campaigns").push({
+    id: CAMPAIGN_ID,
+    business_id: BUSINESS_ID,
+    offering_type: "Python course for students",
+    description: "1-month Python course\nfor just Rs 199.",
+  });
+  db.rows("contacts").push({
+    id: CONTACT_ID,
+    business_id: BUSINESS_ID,
+    name: "Deekshith",
+    phone: "9676000000",
+    is_dnc: opts.dnc ?? false,
+  });
+  db.rows("campaign_sources").push({ campaign_id: CAMPAIGN_ID, raw_text: "Includes 5 projects." });
+  return db;
+}
+
+const asClient = (db: FakeDb) => db as unknown as Parameters<typeof sendBusinessDetails>[1];
+
+export async function runAutomationAndMessagingTests() {
+  console.log("==================================================");
+  console.log("RUNNING SUITE: AUTOMATION & WHATSAPP DETAILS");
+  console.log("==================================================\n");
+
+  // 1. Calling window (IST, campaign window, days, TRAI 09:00-21:00)
+  const window = { calling_start_time: "10:00:00", calling_end_time: "18:30:00", calling_days: [1, 2, 3, 4, 5, 6] };
+  assert.equal(isWithinCallingWindow(ist("2026-10-08T10:30:00"), window), true); // Thursday 10:30
+  assert.equal(isWithinCallingWindow(ist("2026-10-08T09:30:00"), window), false); // before campaign start
+  assert.equal(isWithinCallingWindow(ist("2026-10-08T18:45:00"), window), false); // after campaign end
+  assert.equal(isWithinCallingWindow(ist("2026-10-11T11:00:00"), window), false); // Sunday
+  assert.equal(isWithinCallingWindow(ist("2026-10-08T21:30:00"), null), false); // after TRAI window
+  assert.equal(isWithinCallingWindow(ist("2026-10-08T08:59:00"), null), false); // before TRAI window
+  console.log("  ✅ Callbacks only dial inside the campaign window and 09:00-21:00 IST");
+
+  // 2. Callback results convert to the campaign webhook shape
+  const converted = toCampaignPayload({
+    attempt_id: "att_cb_1",
+    status: "connected",
+    duration: 40,
+    final_agent_variables: { dnc_requested: "no", call_outcome: "INTERESTED" },
+    webhook_config: {
+      metadata: { callback_id: "cb1", contact_id: CONTACT_ID, campaign_id: CAMPAIGN_ID, user_phone_number: "9676000000" },
+    },
+  });
+  assert.ok(converted);
+  assert.equal(converted.campaign_id, CAMPAIGN_ID);
+  assert.equal(converted.user_identifier, CONTACT_ID);
+  assert.equal(converted.completion_status, "completed");
+  assert.equal(toCampaignPayload({ attempt_id: "x", status: "busy" }), null);
+  console.log("  ✅ Callback call results are recorded like campaign calls");
+
+  // 3. WhatsApp template parameters are single-line
+  const message = buildBusinessDetailsMessage({
+    business: {
+      business_name: "Dixit Institutions",
+      description: "Line one\nline two",
+      website: null,
+      business_phone: "+919876543210",
+      business_email: null,
+    },
+    campaign: { offering_type: "Python course", description: "Rs 199\n\nfor 1 month" },
+    sources: [{ raw_text: "5 projects\tincluded" }],
+    customerName: "Deekshith",
+  });
+  for (const value of Object.values(message)) {
+    assert.ok(!/[\n\r\t]/.test(value) && !/\s{2,}/.test(value), `Template param must be one clean line: ${value}`);
+  }
+  assert.ok(message.details.includes("Rs 199 for 1 month"));
+  console.log("  ✅ WhatsApp details are flattened to valid template parameters");
+
+  // 4. Send-details rules
+  const previousToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const previousPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const previousFetch = globalThis.fetch;
+  try {
+    delete process.env.WHATSAPP_ACCESS_TOKEN;
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+    const unconfigured = seedMessagingDb();
+    const notConfigured = await sendBusinessDetails(
+      { contactId: CONTACT_ID, campaignId: CAMPAIGN_ID },
+      asClient(unconfigured)
+    );
+    assert.equal(notConfigured.status, "not_configured");
+    assert.equal(unconfigured.rows("message_logs")[0].status, "not_configured");
+    console.log("  ✅ Without WhatsApp configured the request is logged and the agent says the team will follow up");
+
+    const dncDb = seedMessagingDb({ dnc: true });
+    const dnc = await sendBusinessDetails({ contactId: CONTACT_ID, campaignId: CAMPAIGN_ID }, asClient(dncDb));
+    assert.equal(dnc.status, "skipped");
+    console.log("  ✅ Contacts on the DNC list are never messaged");
+
+    process.env.WHATSAPP_ACCESS_TOKEN = "test-token";
+    process.env.WHATSAPP_PHONE_NUMBER_ID = "123456";
+    const sentRequests: Array<{ url: string; body: Record<string, unknown> }> = [];
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      sentRequests.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+      return new Response(JSON.stringify({ messages: [{ id: "wamid.TEST" }] }), { status: 200 });
+    }) as typeof fetch;
+
+    const configured = seedMessagingDb();
+    const first = await sendBusinessDetails({ contactId: CONTACT_ID, campaignId: CAMPAIGN_ID }, asClient(configured));
+    const second = await sendBusinessDetails({ contactId: CONTACT_ID, campaignId: CAMPAIGN_ID }, asClient(configured));
+    assert.equal(first.status, "sent");
+    assert.equal(second.status, "already_sent");
+    assert.equal(sentRequests.length, 1);
+    assert.equal((sentRequests[0].body as { to: string }).to, "919676000000");
+    console.log("  ✅ Details are sent once to the number on record; repeats within 24h are not resent");
+
+    const foreignCampaign = seedMessagingDb();
+    foreignCampaign.rows("campaigns")[0].business_id = "b0000000-0000-4000-8000-0000000000bb";
+    const crossTenant = await sendBusinessDetails(
+      { contactId: CONTACT_ID, campaignId: CAMPAIGN_ID },
+      asClient(foreignCampaign)
+    );
+    assert.equal(crossTenant.status, "skipped");
+    console.log("  ✅ A contact and campaign from different businesses are rejected");
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousToken === undefined) delete process.env.WHATSAPP_ACCESS_TOKEN;
+    else process.env.WHATSAPP_ACCESS_TOKEN = previousToken;
+    if (previousPhoneId === undefined) delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+    else process.env.WHATSAPP_PHONE_NUMBER_ID = previousPhoneId;
+  }
+
+  // 5. Recycle bin purge keeps recent and running campaigns
+  const purgeDb = new FakeDb();
+  const now = new Date("2026-10-08T06:00:00Z");
+  purgeDb.rows("campaigns").push(
+    { id: "old", status: "DRAFT", deleted_at: "2026-08-01T00:00:00.000Z" },
+    { id: "recent", status: "DRAFT", deleted_at: "2026-10-01T00:00:00.000Z" },
+    { id: "live", status: "READY", deleted_at: null }
+  );
+  const purged = await purgeRecycleBin(
+    purgeDb as unknown as Parameters<typeof purgeRecycleBin>[0],
+    now,
+    []
+  );
+  assert.equal(purged, 1);
+  assert.deepEqual(purgeDb.rows("campaigns").map((c) => c.id).sort(), ["live", "recent"]);
+  console.log("  ✅ Recycle bin removes only campaigns deleted more than 30 days ago\n");
+
+  console.log("==================================================");
+  console.log("ALL AUTOMATION & WHATSAPP TESTS PASSED!");
+  console.log("==================================================\n");
+}

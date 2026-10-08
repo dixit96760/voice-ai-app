@@ -588,8 +588,11 @@ export type Database = {
           completed_at: string | null
           contact_id: string
           created_at: string
+          dial_attempts: number
           id: string
+          last_dialed_at: string | null
           notes: string | null
+          provider_attempt_id: string | null
           requested_at: string
           scheduled_for: string
           status: Database["public"]["Enums"]["callback_status"]
@@ -603,8 +606,11 @@ export type Database = {
           completed_at?: string | null
           contact_id: string
           created_at?: string
+          dial_attempts?: number
           id?: string
+          last_dialed_at?: string | null
           notes?: string | null
+          provider_attempt_id?: string | null
           requested_at?: string
           scheduled_for: string
           status?: Database["public"]["Enums"]["callback_status"]
@@ -618,8 +624,11 @@ export type Database = {
           completed_at?: string | null
           contact_id?: string
           created_at?: string
+          dial_attempts?: number
           id?: string
+          last_dialed_at?: string | null
           notes?: string | null
+          provider_attempt_id?: string | null
           requested_at?: string
           scheduled_for?: string
           status?: Database["public"]["Enums"]["callback_status"]
@@ -2101,6 +2110,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      message_logs: {
+        Row: {
+          business_id: string
+          campaign_id: string | null
+          channel: string
+          contact_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          provider_interaction_id: string | null
+          provider_message_id: string | null
+          purpose: string
+          recipient: string
+          requested_via: string
+          status: string
+        }
+        Insert: {
+          business_id: string
+          campaign_id?: string | null
+          channel?: string
+          contact_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          provider_interaction_id?: string | null
+          provider_message_id?: string | null
+          purpose?: string
+          recipient: string
+          requested_via?: string
+          status: string
+        }
+        Update: {
+          business_id?: string
+          campaign_id?: string | null
+          channel?: string
+          contact_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          provider_interaction_id?: string | null
+          provider_message_id?: string | null
+          purpose?: string
+          recipient?: string
+          requested_via?: string
+          status?: string
+        }
+        Relationships: []
       }
       webhook_events: {
         Row: {

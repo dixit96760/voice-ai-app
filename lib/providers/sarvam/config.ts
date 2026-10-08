@@ -12,6 +12,8 @@ import { SarvamProviderError } from "./errors";
 export const SARVAM_SCHEDULING_BASE_URL = "https://apps.sarvam.ai";
 export const SARVAM_SCHEDULING_PREFIX = "/api/scheduling/v1";
 export const SARVAM_WEBHOOK_PATH = "/api/webhooks/sarvam/campaign";
+export const SARVAM_OUTBOUND_WEBHOOK_PATH = "/api/webhooks/sarvam/outbound";
+export const SARVAM_AGENT_TOOL_SEND_DETAILS_PATH = "/api/agent-tools/send-details";
 
 /** Placeholder values that must never be sent to the real API. */
 const PLACEHOLDER_PATTERN = /^(default|mock|placeholder|example|changeme|your[-_])/i;
@@ -174,6 +176,9 @@ export const SUPPORTED_COHORT_VARIABLES = [
   "offering_type",
   "campaign_objective",
   "campaign_brief",
+  // Identify the call to agent tools (e.g. send_business_details).
+  "contact_id",
+  "campaign_id",
 ] as const;
 
 /**
@@ -200,25 +205,31 @@ export function getWebhookToken(): string | null {
   return isUsableSarvamValue(token) ? token : null;
 }
 
-/**
- * Sarvam campaign webhooks are not documented as signed, so the shared token
- * is carried in the registered URL. Returns the URL to register with Sarvam.
- */
-export function buildCampaignWebhookUrl(): string {
+/** Public origin of this deployment, used in every URL handed to Sarvam. */
+export function getAppBaseUrl(): string {
   let appUrl = readEnv("NEXT_PUBLIC_APP_URL");
   if (!appUrl && process.env.VERCEL_PROJECT_PRODUCTION_URL) {
     appUrl = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
   } else if (!appUrl && process.env.VERCEL_URL) {
     appUrl = `https://${process.env.VERCEL_URL}`;
   }
-  if (!appUrl) {
-    appUrl = "http://localhost:3000";
-  }
-  appUrl = appUrl.replace(/\/+$/, "");
-  const url = new URL(`${appUrl}${SARVAM_WEBHOOK_PATH}`);
+  return (appUrl || "http://localhost:3000").replace(/\/+$/, "");
+}
+
+/**
+ * Sarvam webhooks and agent tool calls are not documented as signed, so the
+ * shared token is carried in the registered URL.
+ */
+export function buildTokenUrl(path: string): string {
+  const url = new URL(`${getAppBaseUrl()}${path}`);
   const token = getWebhookToken();
   if (token) url.searchParams.set("token", token);
   return url.toString();
+}
+
+/** Returns the campaign webhook URL to register with Sarvam. */
+export function buildCampaignWebhookUrl(): string {
+  return buildTokenUrl(SARVAM_WEBHOOK_PATH);
 }
 
 export type SarvamWebhookVerification = "hmac" | "token" | "none";

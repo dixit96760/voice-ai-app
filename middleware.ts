@@ -13,8 +13,9 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - api/webhooks/sarvam and api/webhooks/razorpay (provider-authenticated routes)
+     * - api/cron (CRON_SECRET) and api/agent-tools (Sarvam agent tool token)
      * - static image formats (svg, png, jpg, etc.)
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/webhooks/(?:sarvam|razorpay)(?:/|$)|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/webhooks/(?:sarvam|razorpay)(?:/|$)|api/cron(?:/|$)|api/agent-tools(?:/|$)|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

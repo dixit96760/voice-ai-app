@@ -349,6 +349,7 @@ export async function launchCampaignExecution(
       campaignOffering: campaign.offering_type || undefined,
       businessName: business.business_name,
       campaignObjective: campaign.objective || undefined,
+      campaignId,
       campaignBrief: buildCampaignBrief({
         business,
         campaign: campaign as Campaign,

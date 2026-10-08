@@ -6,6 +6,7 @@ import { runBusinessOnboardingTests } from "./business-onboarding.test";
 import { runCampaignManagementTests } from "./campaign-management.test";
 import { runSarvamTelephonyTests } from "./sarvam-telephony.test";
 import { runSarvamWebhookIdempotencyTests } from "./sarvam-webhook-idempotency.test";
+import { runAutomationAndMessagingTests } from "./automation-and-messaging.test";
 import { runOperationalLayerTests } from "./operational-layer.test";
 import { runBillingSubscriptionTests } from "./billing-subscriptions.test";
 import { runAuthSecurityTests } from "./auth-security.test";
@@ -70,6 +71,9 @@ async function runAllTests() {
   console.log("");
 
   await runSarvamWebhookIdempotencyTests();
+  console.log("");
+
+  await runAutomationAndMessagingTests();
   console.log("");
 
   // 9. Operational Product Layer (Phase 5)
