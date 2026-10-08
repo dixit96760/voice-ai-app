@@ -97,12 +97,16 @@ export async function launchCampaignExecution(
     .order("is_default", { ascending: false })
     .limit(5);
 
-  const activePhone = phoneNumbers?.[0];
-  if (!activePhone) {
+  // Platform dialer numbers on the shared Sarvam connection
+  // (SARVAM_DIALER_PHONE_NUMBERS) serve every business, so a business only
+  // needs its own number when no platform dialer is configured.
+  const providerDialers = getDefaultDialerNumbers();
+  const activePhone = phoneNumbers?.[0] || null;
+  if (!activePhone && providerDialers.length === 0) {
     return {
       success: false,
       error:
-        "No active phone number found for your business. Please add or configure a phone number before launching.",
+        "No caller phone number is configured. Set SARVAM_DIALER_PHONE_NUMBERS for the platform or add an active phone number for this business before launching.",
     };
   }
 
@@ -248,7 +252,6 @@ export async function launchCampaignExecution(
   // can dial, so a configured SARVAM_DIALER_PHONE_NUMBERS pool takes precedence
   // over the locally stored business number. Any additional numbers form the
   // pool used for agent phone rotation.
-  const providerDialers = getDefaultDialerNumbers();
   const rotationPool = providerDialers.length
     ? []
     : (phoneNumbers || [])
@@ -256,13 +259,13 @@ export async function launchCampaignExecution(
         .filter(
           (phone) =>
             (phone.provider_connection_id || null) ===
-            (activePhone.provider_connection_id || null)
+            (activePhone?.provider_connection_id || null)
         )
         .map((phone) => phone.phone_number);
 
   const dialerNumbers = providerDialers.length
     ? providerDialers
-    : [activePhone.phone_number, ...rotationPool];
+    : [activePhone!.phone_number, ...rotationPool];
 
   // 11. Create or Reuse Sarvam Campaign
   let sarvamCampaignId = campaign.sarvam_campaign_id;
@@ -274,7 +277,7 @@ export async function launchCampaignExecution(
         description: campaign.description || campaign.objective || undefined,
         app_id: agentConfig.app_id || campaign.sarvam_agent_id || undefined,
         app_version: agentConfig.app_version || undefined,
-        phone_number_id: activePhone.provider_connection_id || undefined,
+        phone_number_id: activePhone?.provider_connection_id || undefined,
         caller_id: dialerNumbers[0],
         caller_ids: dialerNumbers.slice(1),
         schedule: {

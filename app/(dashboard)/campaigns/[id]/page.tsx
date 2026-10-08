@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { requireBusiness } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { validateCampaignReadiness } from "@/lib/campaign/validator";
+import { getDefaultDialerNumbers } from "@/lib/providers/sarvam/config";
 import type { Campaign, CampaignSource } from "@/lib/campaign/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -122,6 +123,9 @@ export default async function CampaignDetailPage({
     .limit(1)
     .maybeSingle();
 
+  // Launch dials from the platform pool when configured, so show that first.
+  const callerPhone = getDefaultDialerNumbers()[0] || defaultPhone?.phone_number;
+
   // 7. Fetch Recent Campaign Calls & Telephony Metrics
   const { data: campaignCalls } = await supabase
     .from("calls")
@@ -235,7 +239,7 @@ export default async function CampaignDetailPage({
             </span>
             <span>•</span>
             <span>
-              <strong>Caller ID:</strong> {defaultPhone?.phone_number || "Configured Number"}
+              <strong>Caller ID:</strong> {callerPhone || "Not configured"}
             </span>
             <span>•</span>
             <span>
@@ -264,7 +268,7 @@ export default async function CampaignDetailPage({
             callingWindow={`${campaign.calling_start_time?.slice(0, 5)} - ${campaign.calling_end_time?.slice(0, 5)} (${campaign.timezone || "IST"})`}
             callingDays={formattedDays || "Mon-Sat"}
             maxAttempts={campaign.max_attempts}
-            callerPhone={defaultPhone?.phone_number}
+            callerPhone={callerPhone}
             language={String(config.language || "en-IN")}
             voicePersona={String(config.voiceId || "ananya-friendly")}
           />
