@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness, getCurrentUser } from "@/lib/auth/session";
@@ -16,7 +17,8 @@ export interface AuthContext {
   role: OrganizationRole;
 }
 
-export async function getAuthContext(): Promise<AuthContext | null> {
+// Memoized per server render; see lib/auth/session.ts.
+export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
   const user = await getCurrentUser();
   if (!user) return null;
 
@@ -24,17 +26,16 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   if (!business) return null;
 
   const supabase = await createClient();
-  const { data: role, error: roleError } = await supabase.rpc(
-    "auth_user_role_for_business",
-    { p_business_id: business.id }
-  );
-
-  const { data: organization } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("business_id", business.id)
-    .eq("status", "ACTIVE")
-    .maybeSingle();
+  // Independent lookups: run them concurrently.
+  const [{ data: role, error: roleError }, { data: organization }] = await Promise.all([
+    supabase.rpc("auth_user_role_for_business", { p_business_id: business.id }),
+    supabase
+      .from("organizations")
+      .select("id")
+      .eq("business_id", business.id)
+      .eq("status", "ACTIVE")
+      .maybeSingle(),
+  ]);
 
   // Preserve the legacy owner-only behavior while the additive membership
   // migration is being rolled out. Once the RPC exists, its role is authoritative.
@@ -59,7 +60,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     organizationId: organization.id,
     role,
   };
-}
+});
 
 export async function requireAuthContext(): Promise<AuthContext> {
   const context = await getAuthContext();

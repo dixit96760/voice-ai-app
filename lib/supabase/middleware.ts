@@ -159,15 +159,32 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
+  // Public pages (marketing, legal) need no account or business checks, so
+  // they skip the extra database round trips below.
+  const needsAccountChecks =
+    isDashboardRoute ||
+    isOnboardingRoute ||
+    isAuthRoute ||
+    isApiRoute ||
+    recoveryMode ||
+    pathname.startsWith("/update-password") ||
+    pathname.startsWith("/auth/");
+  if (!needsAccountChecks) {
+    return response;
+  }
+
+  // The account-state and membership lookups are independent, so run them
+  // concurrently instead of paying two sequential database round trips.
+  const [activeResult, businessResult] = await Promise.allSettled([
+    supabase.rpc("auth_user_is_active"),
+    supabase.rpc("auth_user_business_ids"),
+  ]);
+
+  // Keep compatibility with a database that has not applied the additive
+  // account-state migration yet; server actions still verify the profile.
   let accountActive = true;
-  try {
-    const { data: isActive, error: accountError } = await supabase.rpc(
-      "auth_user_is_active"
-    );
-    if (!accountError) accountActive = Boolean(isActive);
-  } catch {
-    // Keep compatibility with a database that has not applied the additive
-    // account-state migration yet; server actions still verify the profile.
+  if (activeResult.status === "fulfilled" && !activeResult.value.error) {
+    accountActive = Boolean(activeResult.value.data);
   }
 
   if (!accountActive) {
@@ -201,11 +218,12 @@ export async function updateSession(request: NextRequest) {
   // Fall back to the legacy owner lookup while an older database is draining.
   let hasBusiness = false;
   try {
-    const { data: businessIds, error: membershipError } = await supabase.rpc(
-      "auth_user_business_ids"
-    );
+    const businessIds =
+      businessResult.status === "fulfilled" && !businessResult.value.error
+        ? businessResult.value.data
+        : null;
 
-    if (!membershipError && Array.isArray(businessIds)) {
+    if (Array.isArray(businessIds)) {
       hasBusiness = businessIds.length > 0;
     } else {
       const { data: business } = await supabase

@@ -41,6 +41,8 @@ function SubmitButton() {
   );
 }
 
+const PHONE_AUTH_ENABLED = process.env.NEXT_PUBLIC_PHONE_AUTH_ENABLED === "true";
+
 export default function LoginPage() {
   const [state, formAction] = useFormState<AuthActionResult | null, FormData>(
     signInWithEmail,
@@ -302,7 +304,9 @@ export default function LoginPage() {
           </Alert>
         )}
 
-        {/* Mode switcher: Email vs Phone OTP */}
+        {/* Mode switcher: Email vs Phone OTP. Phone sign-in needs an SMS
+            provider configured in Supabase, so it is opt-in. */}
+        {PHONE_AUTH_ENABLED && (
         <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-xs font-semibold">
           <button
             type="button"
@@ -329,6 +333,7 @@ export default function LoginPage() {
             Phone OTP (India)
           </button>
         </div>
+        )}
 
         {authMode === "email" ? (
           <form action={formAction} className="space-y-4">

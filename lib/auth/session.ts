@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { Database } from "@/lib/supabase/types";
@@ -6,7 +7,11 @@ import type { User } from "@supabase/supabase-js";
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Business = Database["public"]["Tables"]["businesses"]["Row"];
 
-export async function getCurrentUser(): Promise<User | null> {
+// The session helpers below are memoized per server render with React's
+// cache(), so a layout and page that both ask for the user, profile or
+// business share one lookup instead of repeating Supabase round trips.
+// Outside a render (server actions, route handlers) cache() is a no-op.
+export const getCurrentUser = cache(async (): Promise<User | null> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -17,7 +22,7 @@ export async function getCurrentUser(): Promise<User | null> {
     return null;
   }
   return user;
-}
+});
 
 export async function ensureProfile(user: User): Promise<Profile | null> {
   const supabase = await createClient();
@@ -53,7 +58,7 @@ export async function ensureProfile(user: User): Promise<Profile | null> {
   return profile;
 }
 
-export async function getCurrentProfile(): Promise<Profile | null> {
+export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   const user = await getCurrentUser();
   if (!user) return null;
 
@@ -69,9 +74,9 @@ export async function getCurrentProfile(): Promise<Profile | null> {
   }
 
   return profile;
-}
+});
 
-export async function getCurrentBusiness(): Promise<Business | null> {
+export const getCurrentBusiness = cache(async (): Promise<Business | null> => {
   const user = await getCurrentUser();
   if (!user) return null;
 
@@ -122,7 +127,7 @@ export async function getCurrentBusiness(): Promise<Business | null> {
     .maybeSingle();
 
   return business;
-}
+});
 
 export async function requireAuth(): Promise<User> {
   const user = await getCurrentUser();
