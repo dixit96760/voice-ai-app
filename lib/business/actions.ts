@@ -71,8 +71,11 @@ export async function createBusinessAction(
 
   const supabase = await createClient();
 
-  // Insert business record with owner_id strictly derived from authenticated session
-  const { data: newBusiness, error: insertError } = await supabase
+  // Insert business record with owner_id strictly derived from authenticated session.
+  // No RETURNING: the row only becomes readable once the AFTER INSERT trigger
+  // has created its organization and owner membership, and Postgres checks the
+  // SELECT policy for RETURNING before that trigger runs.
+  const { error: insertError } = await supabase
     .from("businesses")
     .insert({
       owner_id: user.id,
@@ -88,23 +91,28 @@ export async function createBusinessAction(
       country: validation.data.country,
       timezone: validation.data.timezone,
       logo_url: uploadedLogoUrl,
-    })
-    .select("*")
-    .single();
+    });
 
   if (insertError) {
     // Check if unique constraint violation (duplicate click or existing business)
     if (insertError.code === "23505") {
       redirect("/dashboard");
     }
+    console.error("Business creation failed:", insertError.code, insertError.message);
     return {
       error: "Failed to create business profile. Please try again.",
     };
   }
 
+  const { data: newBusiness } = await supabase
+    .from("businesses")
+    .select("*")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+
   // Initialize starter subscription for business
   if (newBusiness) {
-    await supabase.from("subscriptions").insert({
+    const { error: subscriptionError } = await supabase.from("subscriptions").insert({
       business_id: newBusiness.id,
       plan_name: "STARTER",
       status: "ACTIVE",
@@ -116,6 +124,13 @@ export async function createBusinessAction(
         recording_retention_days: 45,
       },
     });
+    if (subscriptionError) {
+      console.error(
+        "Starter subscription creation failed:",
+        subscriptionError.code,
+        subscriptionError.message
+      );
+    }
 
     // Record audit log
     await supabase.from("audit_logs").insert({
