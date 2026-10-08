@@ -49,7 +49,7 @@ export default async function DashboardLayout({
               <PhoneCall className="h-5 w-5" aria-hidden="true" />
             </span>
             <span className="flex flex-col">
-              <span className="text-sm font-bold tracking-tight">Sarvam Voice AI</span>
+              <span className="text-sm font-bold tracking-tight">ReachKaro AI</span>
               <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Voice operations
               </span>
@@ -108,7 +108,7 @@ export default async function DashboardLayout({
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <PhoneCall className="h-4 w-4" aria-hidden="true" />
                 </span>
-                <span className="hidden text-sm font-bold sm:inline">Sarvam Voice AI</span>
+                <span className="hidden text-sm font-bold sm:inline">ReachKaro AI</span>
               </Link>
             </div>
 

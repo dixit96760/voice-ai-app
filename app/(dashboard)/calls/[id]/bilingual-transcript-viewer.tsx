@@ -109,7 +109,7 @@ export function BilingualTranscriptViewer({
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3 text-[10px] opacity-75">
-                    <span className="font-semibold">{isAgent ? "Sarvam Voice AI" : "Customer"}</span>
+                    <span className="font-semibold">{isAgent ? "ReachKaro AI" : "Customer"}</span>
                     {turn.start_timestamp !== undefined && (
                       <span className="font-mono">{formatTimestamp(turn.start_timestamp)}</span>
                     )}

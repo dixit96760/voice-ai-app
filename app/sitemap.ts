@@ -7,7 +7,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
-      : "https://sarvamvoice.ai");
+      : "https://voice-ai-app-beryl.vercel.app");
   const now = new Date();
 
   return [

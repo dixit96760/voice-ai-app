@@ -3,9 +3,9 @@ import { Metadata } from "next";
 import { PhoneCall } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Sarvam Voice AI",
+  title: "Privacy Policy | ReachKaro AI",
   description:
-    "Privacy Policy for Sarvam Voice AI. Details regarding data processing, contact storage, voice call recordings, and compliance with Indian data protection laws.",
+    "Privacy Policy for ReachKaro AI. Details regarding data processing, contact storage, voice call recordings, and compliance with Indian data protection laws.",
   alternates: {
     canonical: "/privacy",
   },
@@ -25,7 +25,7 @@ export default function PrivacyPolicyPage() {
               <PhoneCall className="h-5 w-5" aria-hidden="true" />
             </span>
             <span className="flex flex-col">
-              <span className="text-sm font-bold tracking-tight">Sarvam Voice AI</span>
+              <span className="text-sm font-bold tracking-tight">ReachKaro AI</span>
               <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Legal
               </span>
@@ -49,7 +49,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-base font-bold text-foreground">1. Overview & Scope</h2>
             <p className="mt-2">
-              Sarvam Voice AI (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) provides automated B2B outbound telephony and AI voice agent orchestration services for business enterprises. This Privacy Policy outlines how we collect, store, process, and protect customer lead directories, contact data, call audio recordings, and bilingual conversation transcripts.
+              ReachKaro AI (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) provides automated B2B outbound telephony and AI voice agent orchestration services for business enterprises. This Privacy Policy outlines how we collect, store, process, and protect customer lead directories, contact data, call audio recordings, and bilingual conversation transcripts.
             </p>
           </section>
 
@@ -107,7 +107,7 @@ export default function PrivacyPolicyPage() {
       {/* Footer */}
       <footer className="border-t border-violet-100 bg-gradient-to-r from-violet-50/50 via-background to-pink-50/50">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
-          <p>© {new Date().getFullYear()} Sarvam Voice AI. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} ReachKaro AI. All rights reserved.</p>
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
             <Link href="/terms" className="hover:underline">Terms of Service</Link>

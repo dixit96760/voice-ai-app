@@ -3,9 +3,9 @@ import { Metadata } from "next";
 import { PhoneCall } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Cancellation & Refund Policy | Sarvam Voice AI",
+  title: "Cancellation & Refund Policy | ReachKaro AI",
   description:
-    "Cancellation and refund policy for subscriptions and voice minute allowances on Sarvam Voice AI.",
+    "Cancellation and refund policy for subscriptions and voice minute allowances on ReachKaro AI.",
   alternates: {
     canonical: "/refund",
   },
@@ -25,7 +25,7 @@ export default function RefundPolicyPage() {
               <PhoneCall className="h-5 w-5" aria-hidden="true" />
             </span>
             <span className="flex flex-col">
-              <span className="text-sm font-bold tracking-tight">Sarvam Voice AI</span>
+              <span className="text-sm font-bold tracking-tight">ReachKaro AI</span>
               <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Refunds
               </span>
@@ -101,7 +101,7 @@ export default function RefundPolicyPage() {
       {/* Footer */}
       <footer className="border-t border-violet-100 bg-gradient-to-r from-violet-50/50 via-background to-pink-50/50">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
-          <p>© {new Date().getFullYear()} Sarvam Voice AI. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} ReachKaro AI. All rights reserved.</p>
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
             <Link href="/terms" className="hover:underline">Terms of Service</Link>

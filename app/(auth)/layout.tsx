@@ -28,7 +28,7 @@ export default function AuthLayout({
             <PhoneCall className="h-5 w-5" aria-hidden="true" />
           </span>
           <span className="flex flex-col">
-            <span className="text-lg font-bold tracking-tight">Sarvam Voice AI</span>
+            <span className="text-lg font-bold tracking-tight">ReachKaro AI</span>
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Intelligent outbound calling
             </span>
@@ -65,7 +65,7 @@ export default function AuthLayout({
       </main>
 
       <footer className="relative z-10 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Sarvam Voice AI. Built for Indian businesses.
+        © {new Date().getFullYear()} ReachKaro AI. Built for Indian businesses.
       </footer>
     </div>
   );

@@ -48,7 +48,7 @@ export default function HomePage() {
     "@graph": [
       {
         "@type": "SoftwareApplication",
-        name: "Sarvam Voice AI",
+        name: "ReachKaro AI",
         applicationCategory: "BusinessApplication",
         operatingSystem: "Cloud",
         description:
@@ -61,8 +61,8 @@ export default function HomePage() {
       },
       {
         "@type": "Organization",
-        name: "Sarvam Voice AI",
-        url: "https://sarvamvoice.ai",
+        name: "ReachKaro AI",
+        url: "https://voice-ai-app-beryl.vercel.app",
       },
     ],
   };
@@ -83,7 +83,7 @@ export default function HomePage() {
               <PhoneCall className="h-5 w-5" aria-hidden="true" />
             </span>
             <span className="flex flex-col">
-              <span className="text-sm font-bold tracking-tight">Sarvam Voice AI</span>
+              <span className="text-sm font-bold tracking-tight">ReachKaro AI</span>
               <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 B2B telephony
               </span>
@@ -365,7 +365,7 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
           <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
             <PhoneCall className="h-4 w-4 text-primary" aria-hidden="true" />
-            Sarvam Voice AI
+            ReachKaro AI
           </div>
           <div className="flex flex-wrap gap-4 text-xs font-medium">
             <Link href="/pricing" className="hover:text-foreground hover:underline">
@@ -384,7 +384,7 @@ export default function HomePage() {
               Contact Us
             </Link>
           </div>
-          <p>© {new Date().getFullYear()} Sarvam Voice AI. Built for modern Indian businesses.</p>
+          <p>© {new Date().getFullYear()} ReachKaro AI. Built for modern Indian businesses.</p>
         </div>
       </footer>
     </div>

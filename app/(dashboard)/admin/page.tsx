@@ -22,7 +22,7 @@ import {
 import { getSarvamConfigStatus } from "@/lib/providers/sarvam";
 
 export const metadata = {
-  title: "Admin & Operations | Sarvam Voice AI",
+  title: "Admin & Operations | ReachKaro AI",
 };
 
 export default async function AdminBackofficePage() {
