@@ -27,6 +27,10 @@ const FINISHED_SARVAM_STATUSES = new Set([
 
 const RECYCLE_BIN_DAYS = 30;
 const MAX_CALLBACK_DIAL_ATTEMPTS = 3;
+/** A callback this long past its requested time is marked MISSED, not dialled. */
+const MAX_CALLBACK_AGE_MS = 48 * 60 * 60 * 1000;
+/** Callbacks dialled per scheduler run; held ones (paused campaigns) don't count. */
+const MAX_CALLBACKS_DIALED_PER_RUN = 20;
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["TRIAL", "ACTIVE", "PAST_DUE"]);
 
 export interface SchedulerReport {
@@ -141,16 +145,43 @@ export async function dialDueCallbacks(
 ): Promise<number> {
   const { data: due } = await supabase
     .from("callbacks")
-    .select("id, business_id, campaign_id, contact_id, dial_attempts")
+    .select("id, business_id, campaign_id, contact_id, dial_attempts, scheduled_for, notes")
     .eq("status", "SCHEDULED")
     .lte("scheduled_for", now.toISOString())
     .lt("dial_attempts", MAX_CALLBACK_DIAL_ATTEMPTS)
     .order("scheduled_for", { ascending: true })
-    .limit(20);
+    .limit(100);
+
+  const closeCallback = (
+    callback: { id: string; notes: string | null },
+    status: "CANCELLED" | "MISSED",
+    reason: string
+  ) =>
+    supabase
+      .from("callbacks")
+      .update({
+        status,
+        notes: [callback.notes, reason].filter(Boolean).join(" | "),
+        updated_at: now.toISOString(),
+      })
+      .eq("id", callback.id)
+      .eq("status", "SCHEDULED");
 
   let dialed = 0;
   for (const callback of due || []) {
+    if (dialed >= MAX_CALLBACKS_DIALED_PER_RUN) break;
     try {
+      // Too long past the requested time: calling now would surprise the
+      // customer, so record it as missed for the team to follow up.
+      if (now.getTime() - Date.parse(callback.scheduled_for) > MAX_CALLBACK_AGE_MS) {
+        await closeCallback(
+          callback,
+          "MISSED",
+          "Not dialled: more than 48 hours past the requested time."
+        );
+        continue;
+      }
+
       const [{ data: contact }, { data: campaign }, { data: business }, { data: subscription }] =
         await Promise.all([
           supabase
@@ -174,17 +205,22 @@ export async function dialDueCallbacks(
         ]);
 
       if (!contact || !business || contact.is_dnc || contact.is_wrong_number) {
-        await supabase
-          .from("callbacks")
-          .update({
-            status: "CANCELLED",
-            notes: "Callback cancelled: contact is on the DNC list, a wrong number, or missing.",
-            updated_at: now.toISOString(),
-          })
-          .eq("id", callback.id)
-          .eq("status", "SCHEDULED");
+        await closeCallback(
+          callback,
+          "CANCELLED",
+          "Callback cancelled: contact is on the DNC list, a wrong number, or missing."
+        );
         continue;
       }
+
+      if (campaign?.deleted_at) {
+        await closeCallback(callback, "CANCELLED", "Callback cancelled: the campaign was deleted.");
+        continue;
+      }
+
+      // The business paused this campaign: hold the callback (it stays
+      // SCHEDULED) and dial it once the campaign is resumed.
+      if (campaign?.status === "PAUSED") continue;
 
       if (!subscription || !ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status)) continue;
       if (!isWithinCallingWindow(now, campaign as Campaign | null)) continue;

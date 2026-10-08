@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { FakeDb } from "./sarvam-webhook-idempotency.test";
-import { isWithinCallingWindow, purgeRecycleBin } from "../lib/telephony/scheduler";
+import { dialDueCallbacks, isWithinCallingWindow, purgeRecycleBin } from "../lib/telephony/scheduler";
 import { toCampaignPayload } from "../lib/telephony/outbound-webhook";
 import { buildBusinessDetailsMessage } from "../lib/messaging/business-details";
 import { sendBusinessDetails } from "../lib/messaging/send-business-details";
@@ -149,7 +149,42 @@ export async function runAutomationAndMessagingTests() {
     else process.env.WHATSAPP_PHONE_NUMBER_ID = previousPhoneId;
   }
 
-  // 5. Recycle bin purge keeps recent and running campaigns
+  // 5. Callback rules: hold for paused campaigns, cancel for deleted ones,
+  //    expire ones long past their time. None of these reach the dialler.
+  const cbDb = new FakeDb();
+  const tickAt = ist("2026-10-09T11:30:00"); // Friday, inside the calling window
+  cbDb.rows("businesses").push({ id: BUSINESS_ID, business_name: "Dixit Institutions" });
+  cbDb.rows("subscriptions").push({ business_id: BUSINESS_ID, status: "ACTIVE" });
+  cbDb.rows("contacts").push({ id: CONTACT_ID, business_id: BUSINESS_ID, name: "D", phone: "+919676000000", is_dnc: false, is_wrong_number: false });
+  cbDb.rows("campaigns").push(
+    { id: "camp-paused", business_id: BUSINESS_ID, status: "PAUSED", deleted_at: null, calling_start_time: "10:00:00", calling_end_time: "18:30:00", calling_days: [1, 2, 3, 4, 5, 6] },
+    { id: "camp-deleted", business_id: BUSINESS_ID, status: "READY", deleted_at: "2026-10-08T00:00:00Z", calling_start_time: "10:00:00", calling_end_time: "18:30:00", calling_days: [1, 2, 3, 4, 5, 6] }
+  );
+  const callback = (id: string, campaignId: string, scheduledFor: string) => ({
+    id, business_id: BUSINESS_ID, campaign_id: campaignId, contact_id: CONTACT_ID,
+    status: "SCHEDULED", dial_attempts: 0, scheduled_for: scheduledFor, notes: "Requested on call",
+  });
+  cbDb.rows("callbacks").push(
+    callback("cb-paused", "camp-paused", "2026-10-09T05:00:00.000Z"),
+    callback("cb-deleted", "camp-deleted", "2026-10-09T05:00:00.000Z"),
+    callback("cb-stale", "camp-paused", "2026-10-06T05:00:00.000Z")
+  );
+  const cbErrors: string[] = [];
+  const dialedCount = await dialDueCallbacks(
+    cbDb as unknown as Parameters<typeof dialDueCallbacks>[0],
+    tickAt,
+    cbErrors
+  );
+  const byId = (id: string) => cbDb.rows("callbacks").find((r) => r.id === id)!;
+  assert.equal(dialedCount, 0);
+  assert.deepEqual(cbErrors, []);
+  assert.equal(byId("cb-paused").status, "SCHEDULED");
+  assert.equal(byId("cb-deleted").status, "CANCELLED");
+  assert.equal(byId("cb-stale").status, "MISSED");
+  assert.ok(String(byId("cb-stale").notes).startsWith("Requested on call | "));
+  console.log("  ✅ Callbacks wait while the campaign is paused, cancel if it was deleted, expire after 48h");
+
+  // 6. Recycle bin purge keeps recent and running campaigns
   const purgeDb = new FakeDb();
   const now = new Date("2026-10-08T06:00:00Z");
   purgeDb.rows("campaigns").push(
