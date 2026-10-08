@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   const { error } = await supabase.auth.resend({
     type: "signup",
     email,
-    options: { emailRedirectTo: `${origin}/auth/verify` },
+    options: { emailRedirectTo: `${origin}/auth/callback` },
   });
 
   // Keep the response generic so the endpoint cannot enumerate accounts.

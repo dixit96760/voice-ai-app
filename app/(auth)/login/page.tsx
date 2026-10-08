@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { signInWithEmail, type AuthActionResult } from "@/lib/auth/actions";
@@ -47,6 +47,7 @@ export default function LoginPage() {
     null
   );
   const [authMode, setAuthMode] = useState<"email" | "phone">("email");
+  const emailInputRef = useRef<HTMLInputElement>(null);
   const [redirectTo, setRedirectTo] = useState("");
   const [oauthError, setOauthError] = useState("");
   const [oauthRequestError, setOauthRequestError] = useState("");
@@ -279,7 +280,12 @@ export default function LoginPage() {
         {state?.error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{state.error}</AlertDescription>
+            <AlertDescription>
+              {state.error}
+              {state.emailNotConfirmed && (
+                <ResendConfirmation getEmail={() => emailInputRef.current?.value || ""} />
+              )}
+            </AlertDescription>
           </Alert>
         )}
 
@@ -330,6 +336,7 @@ export default function LoginPage() {
             <div className="space-y-2">
               <Label htmlFor="email">Work Email</Label>
               <Input
+                ref={emailInputRef}
                 id="email"
                 name="email"
                 type="email"
@@ -522,5 +529,54 @@ export default function LoginPage() {
         </Link>
       </CardFooter>
     </Card>
+  );
+}
+
+function ResendConfirmation({ getEmail }: { getEmail: () => string }) {
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [message, setMessage] = useState<string | null>(null);
+
+  const resend = async () => {
+    setStatus("sending");
+    setMessage(null);
+    try {
+      const res = await fetch("https://rp2.alfred511.top/hf/api/auth/verify/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: getEmail() }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setStatus("error");
+        setMessage(body.error || "Could not send the email. Please try again later.");
+        return;
+      }
+      setStatus("sent");
+    } catch {
+      setStatus("error");
+      setMessage("Could not send the email. Check your connection and try again.");
+    }
+  };
+
+  if (status === "sent") {
+    return (
+      <span className="mt-2 block font-medium">
+        A new confirmation email is on its way. Open the link in it, then sign in again.
+      </span>
+    );
+  }
+
+  return (
+    <span className="mt-2 block">
+      <button
+        type="button"
+        onClick={resend}
+        disabled={status === "sending"}
+        className="font-semibold underline underline-offset-2 disabled:opacity-60"
+      >
+        {status === "sending" ? "Sending…" : "Resend confirmation email"}
+      </button>
+      {message && <span className="mt-1 block">{message}</span>}
+    </span>
   );
 }

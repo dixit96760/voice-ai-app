@@ -40,6 +40,8 @@ export interface AuthActionResult {
   fieldErrors?: Record<string, string>;
   success?: boolean;
   message?: string;
+  /** Sign-in was refused because the email address is not yet confirmed. */
+  emailNotConfirmed?: boolean;
 }
 
 function getAuthErrorMessage(message: string): string {
@@ -100,6 +102,13 @@ export async function signInWithEmail(
       metadata: { reason: "INVALID_CREDENTIALS" },
     });
 
+    if (error.code === "email_not_confirmed" || /email not confirmed/i.test(error.message)) {
+      return {
+        error: "Please confirm your email address before signing in. Check your inbox for the confirmation link.",
+        emailNotConfirmed: true,
+      };
+    }
+
     // Provide user-friendly message without leaking system details
     if (error.message.includes("Invalid login credentials")) {
       return { error: "Invalid email or password. Please check your credentials and try again." };
@@ -110,7 +119,10 @@ export async function signInWithEmail(
   if (authData.user) {
     if (authData.user.email && authData.user.email_confirmed_at === null) {
       await revokeSessions("local");
-      return { error: "Please verify your email address before signing in." };
+      return {
+        error: "Please verify your email address before signing in.",
+        emailNotConfirmed: true,
+      };
     }
 
     await ensureProfile(authData.user);
