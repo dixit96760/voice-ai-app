@@ -20,31 +20,31 @@ const defaultAppUrl =
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
-    : "https://sarvamvoice.ai");
+    : "https://voice-ai-app-beryl.vercel.app");
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultAppUrl),
   title: {
-    default: "Sarvam Voice AI | Outbound AI Calling for Indian Businesses",
-    template: "%s | Sarvam Voice AI",
+    default: "ReachKaro AI | Outbound AI Calling for Indian Businesses",
+    template: "%s | ReachKaro AI",
   },
   description:
-    "Launch intelligent, compliant outbound voice campaigns in Hindi, Indian English, and regional languages with Sarvam Voice AI. Automated DNC protection, callbacks, and real-time transcripts.",
-  applicationName: "Sarvam Voice AI",
+    "Launch intelligent, compliant outbound voice campaigns in Hindi, Indian English, and regional languages with ReachKaro AI. Automated DNC protection, callbacks, and real-time transcripts.",
+  applicationName: "ReachKaro AI",
   keywords: [
     "voice AI",
     "outbound calling",
     "telephony",
     "India",
-    "Sarvam AI",
+    "ReachKaro AI",
     "AI sales calls",
     "Hindi voice agent",
     "B2B cold calling software India",
     "TRAI compliant voice AI",
   ],
-  authors: [{ name: "Sarvam Voice AI Team" }],
-  creator: "Sarvam Voice AI",
-  publisher: "Sarvam Voice AI",
+  authors: [{ name: "ReachKaro AI Team" }],
+  creator: "ReachKaro AI",
+  publisher: "ReachKaro AI",
   alternates: {
     canonical: "/",
   },
@@ -52,8 +52,8 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_IN",
     url: "/",
-    siteName: "Sarvam Voice AI",
-    title: "Sarvam Voice AI | Outbound AI Calling for Indian Businesses",
+    siteName: "ReachKaro AI",
+    title: "ReachKaro AI | Outbound AI Calling for Indian Businesses",
     description:
       "Automate outbound phone calls with natural Indic-language voice AI, DNC compliance, and real-time transcripts.",
     images: [
@@ -61,13 +61,13 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Sarvam Voice AI - B2B Outbound Telephony",
+        alt: "ReachKaro AI - B2B Outbound Telephony",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Sarvam Voice AI | Outbound AI Calling for Indian Businesses",
+    title: "ReachKaro AI | Outbound AI Calling for Indian Businesses",
     description:
       "Automate outbound phone calls with natural Indic-language voice AI, DNC compliance, and real-time transcripts.",
     images: ["/og-image.png"],

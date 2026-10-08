@@ -83,7 +83,7 @@ export default function SignUpPage() {
           Create business account
         </CardTitle>
         <CardDescription>
-          Scale customer outreach with intelligent Sarvam AI voice agents
+          Scale customer outreach with intelligent AI voice agents
         </CardDescription>
       </CardHeader>
 

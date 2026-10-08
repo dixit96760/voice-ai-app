@@ -21,7 +21,7 @@ export default async function OnboardingPage() {
             <PhoneCall className="h-5 w-5" aria-hidden="true" />
           </span>
           <span className="flex flex-col">
-            <span className="text-sm font-bold tracking-tight">Sarvam Voice AI</span>
+            <span className="text-sm font-bold tracking-tight">ReachKaro AI</span>
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Business setup
             </span>
@@ -65,7 +65,7 @@ export default async function OnboardingPage() {
       </main>
 
       <footer className="relative z-10 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Sarvam Voice AI
+        © {new Date().getFullYear()} ReachKaro AI
       </footer>
     </div>
   );

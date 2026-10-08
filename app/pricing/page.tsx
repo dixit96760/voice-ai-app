@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Pricing Plans | Sarvam Voice AI",
+  title: "Pricing Plans | ReachKaro AI",
   description:
     "Transparent, predictable B2B outbound AI voice telephony pricing. Tailored for Indian enterprises and growing teams with GST invoicing.",
   alternates: {
@@ -134,7 +134,7 @@ export default function PricingPage() {
               <PhoneCall className="h-5 w-5" aria-hidden="true" />
             </span>
             <span className="flex flex-col">
-              <span className="text-sm font-bold tracking-tight">Sarvam Voice AI</span>
+              <span className="text-sm font-bold tracking-tight">ReachKaro AI</span>
               <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Pricing
               </span>
@@ -289,7 +289,7 @@ export default function PricingPage() {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
           <div className="flex items-center gap-2 font-semibold text-foreground">
             <PhoneCall className="h-4 w-4 text-primary" />
-            Sarvam Voice AI
+            ReachKaro AI
           </div>
           <div className="flex flex-wrap gap-4">
             <Link href="/pricing" className="hover:underline">Pricing</Link>
@@ -298,7 +298,7 @@ export default function PricingPage() {
             <Link href="/refund" className="hover:underline">Cancellation & Refund</Link>
             <Link href="/contact" className="hover:underline">Contact Us</Link>
           </div>
-          <p>© {new Date().getFullYear()} Sarvam Voice AI. Built for modern Indian businesses.</p>
+          <p>© {new Date().getFullYear()} ReachKaro AI. Built for modern Indian businesses.</p>
         </div>
       </footer>
     </div>

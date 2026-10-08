@@ -52,7 +52,7 @@ export function HomeMobileNav() {
           <div className="relative ml-auto flex h-full w-[min(88vw,22rem)] flex-col border-l border-violet-100 bg-white p-5 shadow-2xl">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-bold text-foreground">Explore Sarvam</p>
+                <p className="text-sm font-bold text-foreground">Explore ReachKaro AI</p>
                 <p className="mt-1 text-xs text-muted-foreground">Choose where to go next</p>
               </div>
               <button

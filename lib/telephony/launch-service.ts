@@ -319,7 +319,7 @@ export async function launchCampaignExecution(
         webhook: {
           url: webhookUrl,
           metadata: {
-            platform: "sarvam-voice-ai",
+            platform: "reachkaro-ai",
             business_id: businessId,
             campaign_id: campaignId,
           },

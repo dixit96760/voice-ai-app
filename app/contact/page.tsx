@@ -11,9 +11,9 @@ import {
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Contact Us & Support | Sarvam Voice AI",
+  title: "Contact Us & Support | ReachKaro AI",
   description:
-    "Get in touch with the Sarvam Voice AI team for enterprise voice inquiries, TRAI DLT assistance, support, and billing queries in India.",
+    "Get in touch with the ReachKaro AI team for enterprise voice inquiries, TRAI DLT assistance, support, and billing queries in India.",
   alternates: {
     canonical: "/contact",
   },
@@ -33,7 +33,7 @@ export default function ContactPage() {
               <PhoneCall className="h-5 w-5" aria-hidden="true" />
             </span>
             <span className="flex flex-col">
-              <span className="text-sm font-bold tracking-tight">Sarvam Voice AI</span>
+              <span className="text-sm font-bold tracking-tight">ReachKaro AI</span>
               <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Support
               </span>
@@ -94,11 +94,11 @@ export default function ContactPage() {
             </div>
             <div className="mt-6 pt-4 border-t text-xs">
               <a
-                href="mailto:sales@sarvamvoice.ai"
+                href="mailto:dixit96760@gmail.com"
                 className="font-medium text-primary hover:underline flex items-center gap-1.5"
               >
                 <Mail className="h-3.5 w-3.5" />
-                sales@sarvamvoice.ai
+                dixit96760@gmail.com
               </a>
             </div>
           </div>
@@ -116,11 +116,11 @@ export default function ContactPage() {
             </div>
             <div className="mt-6 pt-4 border-t text-xs">
               <a
-                href="mailto:support@sarvamvoice.ai"
+                href="mailto:dixit96760@gmail.com"
                 className="font-medium text-primary hover:underline flex items-center gap-1.5"
               >
                 <Mail className="h-3.5 w-3.5" />
-                support@sarvamvoice.ai
+                dixit96760@gmail.com
               </a>
             </div>
           </div>
@@ -158,7 +158,7 @@ export default function ContactPage() {
       {/* Footer */}
       <footer className="border-t border-violet-100 bg-gradient-to-r from-violet-50/50 via-background to-pink-50/50">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
-          <p>© {new Date().getFullYear()} Sarvam Voice AI. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} ReachKaro AI. All rights reserved.</p>
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
             <Link href="/terms" className="hover:underline">Terms of Service</Link>
