@@ -8,7 +8,7 @@ function fingerprint(value: string): string {
 }
 
 export async function recordCurrentDevice(userId: string): Promise<void> {
-  const requestHeaders = headers();
+  const requestHeaders = await headers();
   const userAgent = requestHeaders.get("user-agent") || "unknown";
   const forwardedFor = requestHeaders.get("x-forwarded-for") || "unknown";
   const deviceHash = fingerprint(`${userAgent}:${forwardedFor}`);

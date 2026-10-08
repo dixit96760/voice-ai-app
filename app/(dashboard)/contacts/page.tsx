@@ -30,13 +30,14 @@ import {
 } from "./contact-actions-client";
 
 interface ContactsPageProps {
-  searchParams: {
+  searchParams: Promise<{
     q?: string;
     filter?: string;
-  };
+  }>;
 }
 
-export default async function ContactsPage({ searchParams }: ContactsPageProps) {
+export default async function ContactsPage({ searchParams: searchParamsPromise }: ContactsPageProps) {
+  const searchParams = await searchParamsPromise;
   const business = await getCurrentBusiness();
   if (!business) {
     redirect("/onboarding");

@@ -26,10 +26,11 @@ import {
 import CampaignListActions from "./campaign-list-actions";
 
 export default async function CampaignsListPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: { filter?: string };
+  searchParams: Promise<{ filter?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const { business } = await requireBusiness();
   const supabase = await createClient();
 

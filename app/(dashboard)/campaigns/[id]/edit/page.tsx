@@ -9,12 +9,13 @@ import CampaignWizard, { WizardAssignedContact } from "./campaign-wizard";
 import type { Campaign, CampaignSource } from "@/lib/campaign/types";
 
 export default async function CampaignEditPage({
-  params,
-  searchParams,
+  params: paramsPromise,
+  searchParams: searchParamsPromise,
 }: {
-  params: { id: string };
-  searchParams: { step?: string };
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ step?: string }>;
 }) {
+  const [params, searchParams] = await Promise.all([paramsPromise, searchParamsPromise]);
   const { business } = await requireBusiness();
   const supabase = await createClient();
 

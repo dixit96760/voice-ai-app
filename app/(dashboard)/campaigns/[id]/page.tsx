@@ -42,10 +42,11 @@ import {
 import CampaignDetailActions from "./campaign-detail-actions";
 
 export default async function CampaignDetailPage({
-  params,
+  params: paramsPromise,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const params = await paramsPromise;
   const { business } = await requireBusiness();
   const supabase = await createClient();
   const campaignId = params.id;

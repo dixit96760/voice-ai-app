@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   // 1. Rate Limiting Check (100 req/min per IP)
-  const clientIp = request.ip || request.headers.get("x-forwarded-for") || "anonymous";
+  const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
   const rateLimit = await assertRateLimit(`rl:webhook:razorpay:${clientIp}`, 100, 1.6);
 
   if (!rateLimit.allowed) {

@@ -21,12 +21,13 @@ import { Badge } from "@/components/ui/badge";
 import { CsvExportButton } from "./csv-export-button";
 
 interface CampaignAnalyticsPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export default async function CampaignAnalyticsPage({ params }: CampaignAnalyticsPageProps) {
+export default async function CampaignAnalyticsPage({ params: paramsPromise }: CampaignAnalyticsPageProps) {
+  const params = await paramsPromise;
   const business = await getCurrentBusiness();
   if (!business) {
     redirect("/onboarding");

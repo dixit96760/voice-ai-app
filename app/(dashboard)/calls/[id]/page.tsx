@@ -21,12 +21,13 @@ import { CallRecordingPlayer } from "./call-recording-player";
 import { BilingualTranscriptViewer } from "./bilingual-transcript-viewer";
 
 interface CallDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export default async function CallDetailPage({ params }: CallDetailPageProps) {
+export default async function CallDetailPage({ params: paramsPromise }: CallDetailPageProps) {
+  const params = await paramsPromise;
   const business = await getCurrentBusiness();
   if (!business) {
     redirect("/onboarding");

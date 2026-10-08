@@ -17,7 +17,7 @@ async function getAuthRateLimitError(
   scope: "signup" | "login" | "reset",
   email: string
 ): Promise<string | null> {
-  const requestHeaders = headers();
+  const requestHeaders = await headers();
   const ip = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const key = `auth:${scope}:${email.toLowerCase()}:${ip}`;
   const limits = {
@@ -353,7 +353,7 @@ export async function updatePassword(
   const newPassword = formData.get("newPassword") as string;
   const confirmPassword = formData.get("confirmPassword") as string;
   const currentPassword = formData.get("currentPassword") as string;
-  const isRecoverySession = cookies().get("auth_recovery")?.value === "1";
+  const isRecoverySession = (await cookies()).get("auth_recovery")?.value === "1";
 
   if (!isRecoverySession && !currentPassword) {
     return { error: "Enter your current password to confirm this change." };
@@ -415,7 +415,7 @@ export async function updatePassword(
   // A password change invalidates all existing refresh sessions. This also
   // clears the short-lived recovery marker after a successful reset.
   await revokeSessions("global");
-  cookies().delete("auth_recovery");
+  (await cookies()).delete("auth_recovery");
 
   return {
     success: true,

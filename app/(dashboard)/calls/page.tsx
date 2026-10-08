@@ -25,16 +25,17 @@ import {
 import type { CallStatus, CallOutcome } from "@/lib/supabase/types";
 
 interface CallsPageProps {
-  searchParams: {
+  searchParams: Promise<{
     q?: string;
     campaignId?: string;
     status?: string;
     outcome?: string;
     page?: string;
-  };
+  }>;
 }
 
-export default async function CallsPage({ searchParams }: CallsPageProps) {
+export default async function CallsPage({ searchParams: searchParamsPromise }: CallsPageProps) {
+  const searchParams = await searchParamsPromise;
   const business = await getCurrentBusiness();
   if (!business) {
     redirect("/onboarding");

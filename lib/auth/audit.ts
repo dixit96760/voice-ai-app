@@ -11,8 +11,8 @@ function hashRequestValue(value: string | null): string | null {
   return createHash("sha256").update(`${pepper}:${value}`).digest("hex");
 }
 
-function requestContext() {
-  const requestHeaders = headers();
+async function requestContext() {
+  const requestHeaders = await headers();
   return {
     ipHash: hashRequestValue(
       requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || null
@@ -28,7 +28,7 @@ export async function recordAuthSecurityEvent(input: {
   outcome?: "SUCCESS" | "FAILURE";
   metadata?: Record<string, unknown>;
 }): Promise<void> {
-  const request = requestContext();
+  const request = await requestContext();
   const row = {
     user_id: input.userId ?? null,
     organization_id: input.organizationId ?? null,
