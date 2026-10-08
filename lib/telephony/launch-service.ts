@@ -235,13 +235,37 @@ export async function launchCampaignExecution(
     };
   }
 
+  // The reservation RPC already marked the campaign RUNNING. Any failure from
+  // here on must release the minutes and restore the previous status, or the
+  // campaign stays RUNNING and blocks every future launch for the business.
+  const abortLaunch = async (error: string): Promise<CampaignLaunchResult> => {
+    if (quotaReservation.reservationId) {
+      await quotaService.releaseQuotaReservation(quotaReservation.reservationId, businessId, false);
+    }
+    await supabase
+      .from("campaigns")
+      .update({
+        status: campaign.status,
+        started_at: campaign.started_at,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", campaignId)
+      .eq("status", "RUNNING");
+    return { success: false, error };
+  };
+
   // 10. Build Agent Configuration & Prompt
-  const agentConfig = buildSarvamAgentConfig({
-    business,
-    campaign: campaign as Campaign,
-    version: activeVersion,
-    sources: (sources || []) as CampaignSource[],
-  });
+  let agentConfig: ReturnType<typeof buildSarvamAgentConfig>;
+  try {
+    agentConfig = buildSarvamAgentConfig({
+      business,
+      campaign: campaign as Campaign,
+      version: activeVersion,
+      sources: (sources || []) as CampaignSource[],
+    });
+  } catch (err: unknown) {
+    return abortLaunch(`Failed to build the voice agent configuration: ${(err as Error).message}`);
+  }
 
   // Webhook URL registered with Sarvam. The shared token (when configured)
   // lets us verify inbound callbacks, and the metadata is echoed back on
@@ -304,14 +328,15 @@ export async function launchCampaignExecution(
 
       sarvamCampaignId = campResponse.campaign_id;
     } catch (err: unknown) {
-      if (quotaReservation.reservationId) {
-        await quotaService.releaseQuotaReservation(quotaReservation.reservationId, businessId, false);
-      }
-      return {
-        success: false,
-        error: `Failed to create provider campaign on Sarvam: ${(err as Error).message}`,
-      };
+      return abortLaunch(`Failed to create provider campaign on Sarvam: ${(err as Error).message}`);
     }
+
+    // Persist immediately so a retry after a later failure reuses this Sarvam
+    // campaign instead of creating a duplicate.
+    await supabase
+      .from("campaigns")
+      .update({ sarvam_campaign_id: sarvamCampaignId, updated_at: new Date().toISOString() })
+      .eq("id", campaignId);
   }
 
   // 12. Stream Cohort of Eligible Contacts
@@ -332,13 +357,7 @@ export async function launchCampaignExecution(
 
     cohortId = cohortResult.cohortId;
   } catch (err: unknown) {
-    if (quotaReservation.reservationId) {
-      await quotaService.releaseQuotaReservation(quotaReservation.reservationId, businessId, false);
-    }
-    return {
-      success: false,
-      error: `Failed to stream contacts cohort to Sarvam: ${(err as Error).message}`,
-    };
+    return abortLaunch(`Failed to stream contacts cohort to Sarvam: ${(err as Error).message}`);
   }
 
   // 13. Update Database: Set Campaign to RUNNING
@@ -355,13 +374,7 @@ export async function launchCampaignExecution(
     .eq("id", campaignId);
 
   if (updateError) {
-    if (quotaReservation.reservationId) {
-      await quotaService.releaseQuotaReservation(quotaReservation.reservationId, businessId, false);
-    }
-    return {
-      success: false,
-      error: `Failed to transition campaign to RUNNING: ${updateError.message}`,
-    };
+    return abortLaunch(`Failed to transition campaign to RUNNING: ${updateError.message}`);
   }
 
   // 13. Audit Log

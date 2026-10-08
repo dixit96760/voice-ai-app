@@ -34,6 +34,9 @@ const DAY_NAMES = [
 
 const DEFAULT_START_TIME = "09:00";
 const DEFAULT_END_TIME = "20:00";
+// Sarvam rejects campaigns whose start_timestamp is less than 120 seconds in
+// the future. Schedule with extra margin for clock skew and request latency.
+const MIN_START_LEAD_MS = 3 * 60 * 1000;
 const MAX_DESCRIPTION_LENGTH = 150;
 
 function toHhMm(value: string | null | undefined, fallback: string): string {
@@ -107,10 +110,10 @@ export function buildCreateCampaignPayload(
     ? clamp(params.rate_limit_per_minute / 60, 0.1, 500)
     : getDefaultAttemptsPerSecond();
 
-  const startTimestamp = params.start_timestamp
+  const requestedStart = params.start_timestamp
     ? new Date(params.start_timestamp)
     : new Date();
-  if (Number.isNaN(startTimestamp.getTime())) {
+  if (Number.isNaN(requestedStart.getTime())) {
     throw new SarvamProviderError(
       `Invalid campaign start timestamp "${params.start_timestamp}".`,
       "CAMPAIGN_CONFIGURATION_ERROR",
@@ -119,6 +122,8 @@ export function buildCreateCampaignPayload(
       false
     );
   }
+  const earliestStart = Date.now() + MIN_START_LEAD_MS;
+  const startTimestamp = new Date(Math.max(requestedStart.getTime(), earliestStart));
 
   const endTimestamp = params.end_timestamp
     ? new Date(params.end_timestamp)

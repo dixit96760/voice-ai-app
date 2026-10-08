@@ -570,6 +570,9 @@ export function runSarvamTelephonyTests() {
   if (Date.parse(wirePayload.end_timestamp) <= Date.parse(wirePayload.start_timestamp)) {
     throw new Error("end_timestamp must be after start_timestamp");
   }
+  if (Date.parse(wirePayload.start_timestamp) - Date.now() < 120_000) {
+    throw new Error("start_timestamp must be at least 120 seconds in the future (Sarvam requirement)");
+  }
   if (wirePayload.webhook_config?.url !== "https://app.example.com/api/webhooks/sarvam/campaign?token=abc") {
     throw new Error("webhook_config.url must be forwarded to Sarvam");
   }
