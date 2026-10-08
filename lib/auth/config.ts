@@ -14,7 +14,15 @@ function isValidSupabaseUrl(value: string): boolean {
 }
 
 export function getTrustedAppOrigin(): string | null {
-  const configured = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  // On Vercel, fall back to the project's production domain so auth emails
+  // never link to localhost when NEXT_PUBLIC_APP_URL is not set.
+  const configured =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
   try {
     const url = new URL(configured);
     const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
