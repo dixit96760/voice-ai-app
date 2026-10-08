@@ -322,6 +322,35 @@ export function runSarvamTelephonyTests() {
   console.log("  ✅ Indic Hindi text + English transcript preserved in structured format\n");
 
   // -------------------------------------------------------------
+  // Sarvam output variables are String/Enum typed: flags arrive as text.
+  const textFlagsPayload: SarvamCampaignWebhookPayload = {
+    attempt_id: "att_text_flags",
+    campaign_id: "sarvam_camp_888",
+    cohort_id: "sarvam_cohort_777",
+    app_id: "sarvam_app_999",
+    user_phone_number: "+919849012345",
+    completion_status: "completed",
+    connectivity_status: "connected",
+    duration: 42,
+    output_agent_variables: {
+      dnc_requested: "Yes",
+      callback_requested: "no",
+      customer_questions: "What is the fee?; How long is the course?",
+      interest_level: "low",
+    } as never,
+  };
+  const normTextFlags = normalizeCampaignWebhook(textFlagsPayload);
+  if (!normTextFlags.dncRequested || normTextFlags.callOutcome !== "DO_NOT_CALL") {
+    throw new Error("A text 'Yes' for dnc_requested must be honoured as a do-not-call request");
+  }
+  if (normTextFlags.callbackRequested) {
+    throw new Error("A text 'no' must not be treated as a callback request");
+  }
+  if (normTextFlags.questionsAsked.length !== 2 || normTextFlags.interestLevel !== "LOW") {
+    throw new Error("Text lists and enums from the agent must be normalised");
+  }
+  console.log("  OK. Text-typed agent outputs (Yes/no, lists) are understood; DNC is honoured");
+
   // 8. Webhook Normalization: Connectivity Statuses (Busy, No Answer)
   // -------------------------------------------------------------
   console.log("8. Webhook Connectivity Status Mapping Tests...");
@@ -573,6 +602,9 @@ export function runSarvamTelephonyTests() {
   }
   if (Date.parse(wirePayload.start_timestamp) - Date.now() < 120_000) {
     throw new Error("start_timestamp must be at least 120 seconds in the future (Sarvam requirement)");
+  }
+  if (wirePayload.webhook_config?.url !== "https://app.example.com/api/webhooks/sarvam/campaign?token=abc") {
+    throw new Error("Top-level webhook_config.url must be sent (documented schema)");
   }
   if (wirePayload.app_config.webhook_config?.url !== "https://app.example.com/api/webhooks/sarvam/campaign?token=abc") {
     throw new Error("app_config.webhook_config.url must be forwarded to Sarvam (top-level is ignored)");

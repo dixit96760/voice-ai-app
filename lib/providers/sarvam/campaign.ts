@@ -198,9 +198,11 @@ export function buildCreateCampaignPayload(
       ...(webhook.metadata ? { metadata: webhook.metadata } : {}),
     };
 
-    // Sarvam stores the webhook under app_config.webhook_config. A top-level
-    // webhook_config is accepted but silently dropped, which left campaigns
-    // with no webhook and no call results.
+    // Sarvam's schema documents a top-level webhook_config while its examples
+    // and stored campaigns use app_config.webhook_config; a top-level-only
+    // config was silently dropped, leaving campaigns with no call results.
+    // Send both so the webhook is registered either way.
+    payload.webhook_config = webhookConfig;
     payload.app_config.webhook_config = webhookConfig;
   }
 

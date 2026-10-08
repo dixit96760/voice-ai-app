@@ -29,6 +29,25 @@ export interface NormalizedCallAttempt {
   recommendedNextAction: string | null;
 }
 
+function isAffirmative(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value !== "string") return false;
+  return /^(true|yes|y|1)$/i.test(value.trim());
+}
+
+function toStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value !== "string") return [];
+  const text = value.trim();
+  if (!text || /^(none|n\/a|na|null|-)$/i.test(text)) return [];
+  return text
+    .split(/\n|;|\|/)
+    .map((item) => item.replace(/^[-*\d.)\s]+/, "").trim())
+    .filter(Boolean);
+}
+
 /**
  * Normalizes Sarvam outbound campaign webhook payload into domain entities.
  * Accepts both the current documented field names (`duration`, `retry_attempt`,
@@ -73,15 +92,24 @@ export function normalizeCampaignWebhook(
     }
   }
 
-  // 2. Extract Agent Variables
+  // 2. Extract Agent Variables. Sarvam output variables are String or Enum
+  // typed, so flags arrive as "yes"/"true" and lists as text; accept both
+  // those and native JSON values. Missing a "yes" here would ignore a
+  // customer's do-not-call request.
   const vars = payload.output_agent_variables || {};
-  const dncRequested = vars.dnc_requested === true;
-  const wrongNumber = vars.wrong_number === true;
-  const callbackRequested = vars.callback_requested === true;
-  const callbackDatetime = typeof vars.callback_datetime === "string" ? vars.callback_datetime : null;
-  const interestLevel = typeof vars.interest_level === "string" ? vars.interest_level : null;
-  const questionsAsked = Array.isArray(vars.customer_questions) ? vars.customer_questions : [];
-  const objections = Array.isArray(vars.objections) ? vars.objections : [];
+  const dncRequested = isAffirmative(vars.dnc_requested);
+  const wrongNumber = isAffirmative(vars.wrong_number);
+  const callbackRequested = isAffirmative(vars.callback_requested);
+  const callbackDatetime =
+    typeof vars.callback_datetime === "string" && vars.callback_datetime.trim()
+      ? vars.callback_datetime.trim()
+      : null;
+  const interestLevel =
+    typeof vars.interest_level === "string" && vars.interest_level.trim()
+      ? vars.interest_level.trim().toUpperCase()
+      : null;
+  const questionsAsked = toStringList(vars.customer_questions);
+  const objections = toStringList(vars.objections);
   const recommendedNextAction = typeof vars.next_action === "string" ? vars.next_action : null;
 
   // 3. Resolve Outcome Priority:
