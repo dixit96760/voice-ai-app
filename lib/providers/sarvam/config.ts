@@ -163,9 +163,24 @@ export function getCampaignTtlDays(): number {
 }
 
 /**
- * Agent variable names that may be streamed in a cohort.
- * Sarvam rejects unknown `app_variables`, so this list must mirror the
- * variables configured on the agent used by the campaign.
+ * Per-contact values the app can fill for the agent. One shared agent can
+ * serve every business by reading these instead of a hard-coded script.
+ */
+export const SUPPORTED_COHORT_VARIABLES = [
+  "customer_name",
+  "contact_name",
+  "city",
+  "business_name",
+  "offering_type",
+  "campaign_objective",
+  "campaign_brief",
+] as const;
+
+/**
+ * Agent variable names streamed in a cohort: every supported variable plus
+ * any extra names from SARVAM_COHORT_VARIABLES or the campaign version.
+ * Sarvam rejects variables the agent does not declare; the cohort streamer
+ * drops those and retries, so offering the full set is safe.
  */
 export function getCohortVariableAllowList(overrides?: string[]): string[] {
   const fromEnv = readEnv("SARVAM_COHORT_VARIABLES")
@@ -173,8 +188,7 @@ export function getCohortVariableAllowList(overrides?: string[]): string[] {
     .map((value) => value.trim())
     .filter(Boolean);
 
-  const source = overrides && overrides.length > 0 ? overrides : fromEnv;
-  const list = (source.length > 0 ? source : ["customer_name"])
+  const list = [...SUPPORTED_COHORT_VARIABLES, ...fromEnv, ...(overrides || [])]
     .map((value) => value.trim())
     .filter(Boolean);
 

@@ -1,7 +1,8 @@
-import { buildSarvamAgentConfig } from "../lib/providers/sarvam/agent";
+import { buildCampaignBrief, buildSarvamAgentConfig } from "../lib/providers/sarvam/agent";
 import { normalizeCampaignWebhook } from "../lib/providers/sarvam/webhooks";
 import { buildCreateCampaignPayload } from "../lib/providers/sarvam/campaign";
 import { buildCohortUser, parseUndeclaredAppVariables } from "../lib/providers/sarvam/cohort";
+import { getCohortVariableAllowList } from "../lib/providers/sarvam/config";
 import { normalizeSarvamError, SarvamProviderError } from "../lib/providers/sarvam/errors";
 import { normalizeIndianPhone } from "../lib/validation/phone";
 import { isSarvamMockMode } from "../lib/providers/sarvam/client";
@@ -573,10 +574,10 @@ export function runSarvamTelephonyTests() {
   if (Date.parse(wirePayload.start_timestamp) - Date.now() < 120_000) {
     throw new Error("start_timestamp must be at least 120 seconds in the future (Sarvam requirement)");
   }
-  if (wirePayload.webhook_config?.url !== "https://app.example.com/api/webhooks/sarvam/campaign?token=abc") {
-    throw new Error("webhook_config.url must be forwarded to Sarvam");
+  if (wirePayload.app_config.webhook_config?.url !== "https://app.example.com/api/webhooks/sarvam/campaign?token=abc") {
+    throw new Error("app_config.webhook_config.url must be forwarded to Sarvam (top-level is ignored)");
   }
-  if (wirePayload.webhook_config?.metadata?.campaign_id !== "camp_001") {
+  if (wirePayload.app_config.webhook_config?.metadata?.campaign_id !== "camp_001") {
     throw new Error("webhook_config.metadata must be forwarded for webhook correlation");
   }
   console.log("  OK. Campaign create payload matches the documented scheduling API contract");
@@ -633,6 +634,28 @@ export function runSarvamTelephonyTests() {
     throw new Error("Unrelated provider errors must not be treated as undeclared variables");
   }
   console.log("  OK. Undeclared agent variables are detected for a retry without them");
+
+  // The campaign brief carries this campaign's own offer to the shared agent.
+  const brief = buildCampaignBrief({
+    business: { business_name: "Dixit Institute", description: null } as unknown as Database["public"]["Tables"]["businesses"]["Row"],
+    campaign: {
+      offering_type: "Python course for students",
+      objective: "Promote an offer",
+      description: "1-month Python course for just Rs 199, offer valid until the 15th.",
+    } as unknown as Database["public"]["Tables"]["campaigns"]["Row"],
+    sources: [],
+  });
+  if (!brief.includes("Python course for students") || !brief.includes("Rs 199") || !brief.includes("Dixit Institute")) {
+    throw new Error(`Campaign brief must carry the business, offering and pitch: ${brief}`);
+  }
+  const previousCohortEnv = process.env.SARVAM_COHORT_VARIABLES;
+  process.env.SARVAM_COHORT_VARIABLES = "customer_name";
+  const allowList = getCohortVariableAllowList();
+  process.env.SARVAM_COHORT_VARIABLES = previousCohortEnv;
+  if (!allowList.includes("campaign_brief") || !allowList.includes("business_name")) {
+    throw new Error("Campaign variables must be offered even when SARVAM_COHORT_VARIABLES lists fewer");
+  }
+  console.log("  OK. Campaign brief carries the campaign's own offer to the agent");
 
   // Cohort user records use the documented user_identifier/app_variables shape.
   const cohortUser = buildCohortUser(

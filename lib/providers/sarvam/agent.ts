@@ -13,6 +13,42 @@ export interface BuildAgentConfigParams {
   sources: CampaignSource[];
 }
 
+/** Keeps the per-contact brief well inside provider variable limits. */
+const MAX_CAMPAIGN_BRIEF_CHARS = 3000;
+
+/**
+ * Plain-text brief of what this campaign is about, streamed to the agent as
+ * the `campaign_brief` variable. The Sarvam campaign API only references an
+ * existing agent, so this is how one shared agent learns each campaign's
+ * offer, pitch and approved facts.
+ */
+export function buildCampaignBrief({
+  business,
+  campaign,
+  sources,
+}: Omit<BuildAgentConfigParams, "version">): string {
+  const facts = sources
+    .filter((s) => s.processing_status === "READY" || (s.raw_text && s.raw_text.trim().length > 0))
+    .map((s) => s.raw_text?.trim() || "")
+    .filter(Boolean)
+    .join(" ");
+
+  const brief = [
+    `Business: ${business.business_name}`,
+    business.description ? `About the business: ${business.description}` : "",
+    `Offering: ${campaign.offering_type || "Our services"}`,
+    `Goal of this call: ${campaign.objective || "Share the offer and gauge interest"}`,
+    campaign.description ? `Pitch and offer details: ${campaign.description}` : "",
+    facts ? `Approved facts (only use these): ${facts}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return brief.length > MAX_CAMPAIGN_BRIEF_CHARS
+    ? `${brief.slice(0, MAX_CAMPAIGN_BRIEF_CHARS - 3)}...`
+    : brief;
+}
+
 /**
  * Builds a Sarvam Agent Configuration from internal SaaS domain entities.
  * Grounded in approved campaign knowledge with strict safety guardrails.

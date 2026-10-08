@@ -20,6 +20,9 @@ export interface StreamCohortParams {
   contacts: Contact[];
   campaignOffering?: string;
   businessName?: string;
+  campaignObjective?: string;
+  /** Pitch and approved facts the agent should use for this campaign. */
+  campaignBrief?: string;
   /**
    * Agent variable names to stream. Sarvam rejects cohorts containing
    * variables the agent does not declare, so this is an allow-list.
@@ -85,7 +88,13 @@ function sanitizeCohortName(name: string): string {
  */
 export function buildCohortUser(
   contact: Contact,
-  context: { businessName?: string; campaignOffering?: string; appVariables: string[] }
+  context: {
+    businessName?: string;
+    campaignOffering?: string;
+    campaignObjective?: string;
+    campaignBrief?: string;
+    appVariables: string[];
+  }
 ): SarvamCohortUser {
   const phone = normalizeIndianPhone(contact.phone);
   if (!phone.isValid || !phone.normalized) {
@@ -98,6 +107,8 @@ export function buildCohortUser(
     city: contact.city || "",
     business_name: context.businessName || "",
     offering_type: context.campaignOffering || "",
+    campaign_objective: context.campaignObjective || "",
+    campaign_brief: context.campaignBrief || "",
   };
 
   const appVariables: Record<string, string> = {};
@@ -133,6 +144,8 @@ export async function streamSarvamCohort({
   contacts,
   campaignOffering,
   businessName,
+  campaignObjective,
+  campaignBrief,
   appVariables,
 }: StreamCohortParams): Promise<StreamCohortResult> {
   getSarvamScope();
@@ -162,6 +175,8 @@ export async function streamSarvamCohort({
       buildCohortUser(contact, {
         businessName,
         campaignOffering,
+        campaignObjective,
+        campaignBrief,
         appVariables: allowedVariables,
       })
     );
@@ -202,26 +217,31 @@ export async function streamSarvamCohort({
       });
     };
 
-    let response: SarvamStreamCohortResponse;
-    try {
-      response = await send(withoutVariables(chunk, undeclaredVariables, dropAllVariables));
-    } catch (err) {
-      // The agent does not declare some variables we stream. Calls work
-      // without them (the agent just cannot personalise), so drop them and
-      // retry once rather than failing the launch.
-      const undeclared = parseUndeclaredAppVariables((err as Error).message || "");
-      if (undeclared === null || dropAllVariables) throw err;
-      if (undeclared.length > 0) {
-        undeclared.forEach((name) => undeclaredVariables.add(name));
-      } else {
-        dropAllVariables = true;
+    // The agent may not declare every variable we offer. Calls work without
+    // them (the agent just cannot use them), so drop the ones Sarvam names
+    // and retry instead of failing the launch. Sarvam may name them one at a
+    // time, so allow one retry per offered variable.
+    let response: SarvamStreamCohortResponse | null = null;
+    for (let attempt = 0; response === null; attempt++) {
+      try {
+        response = await send(withoutVariables(chunk, undeclaredVariables, dropAllVariables));
+      } catch (err) {
+        const undeclared = parseUndeclaredAppVariables((err as Error).message || "");
+        const fresh = (undeclared || []).filter((name) => !undeclaredVariables.has(name));
+        if (undeclared === null || dropAllVariables || attempt >= allowedVariables.length) {
+          throw err;
+        }
+        if (fresh.length > 0) {
+          fresh.forEach((name) => undeclaredVariables.add(name));
+        } else {
+          dropAllVariables = true;
+        }
+        console.warn(
+          `Sarvam agent does not declare cohort variable(s) ${
+            fresh.join(", ") || "(unspecified)"
+          }; streaming without them.`
+        );
       }
-      console.warn(
-        `Sarvam agent does not declare cohort variable(s) ${
-          undeclared.join(", ") || "(unspecified)"
-        }; streaming without them. Add them to the agent or adjust SARVAM_COHORT_VARIABLES.`
-      );
-      response = await send(withoutVariables(chunk, undeclaredVariables, dropAllVariables));
     }
 
     lastCohortId = response.cohort_id;

@@ -4,7 +4,7 @@ import {
   buildCampaignWebhookUrl,
   getDefaultDialerNumbers,
 } from "@/lib/providers/sarvam";
-import { buildSarvamAgentConfig } from "@/lib/providers/sarvam/agent";
+import { buildCampaignBrief, buildSarvamAgentConfig } from "@/lib/providers/sarvam/agent";
 import { validateCampaignReadiness } from "@/lib/campaign/validator";
 import { normalizeIndianPhone } from "@/lib/validation/phone";
 import { quotaService } from "@/lib/billing/quota-service";
@@ -348,6 +348,12 @@ export async function launchCampaignExecution(
       contacts: eligibleContacts,
       campaignOffering: campaign.offering_type || undefined,
       businessName: business.business_name,
+      campaignObjective: campaign.objective || undefined,
+      campaignBrief: buildCampaignBrief({
+        business,
+        campaign: campaign as Campaign,
+        sources: (sources || []) as CampaignSource[],
+      }),
       appVariables: Array.isArray(
         (activeVersion.configuration as Record<string, unknown> | null)?.appVariables
       )

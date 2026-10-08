@@ -198,14 +198,10 @@ export function buildCreateCampaignPayload(
       ...(webhook.metadata ? { metadata: webhook.metadata } : {}),
     };
 
-    // The request schema documents webhook_config at the top level while the
-    // webhook payload docs reference app_config.webhook_config. Default to the
-    // documented request shape; opt into the nested shape if needed.
-    if (process.env.SARVAM_WEBHOOK_CONFIG_IN_APP_CONFIG === "true") {
-      payload.app_config.webhook_config = webhookConfig;
-    } else {
-      payload.webhook_config = webhookConfig;
-    }
+    // Sarvam stores the webhook under app_config.webhook_config. A top-level
+    // webhook_config is accepted but silently dropped, which left campaigns
+    // with no webhook and no call results.
+    payload.app_config.webhook_config = webhookConfig;
   }
 
   return payload;
