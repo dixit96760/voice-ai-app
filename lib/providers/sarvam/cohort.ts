@@ -35,6 +35,43 @@ export interface StreamCohortResult {
   rejectedCount: number;
 }
 
+/**
+ * Sarvam rejects the whole cohort when it carries a variable the agent does
+ * not declare, e.g. "The following app variables are not found in the agent's
+ * variables: customer_name". Returns the named variables, or null when the
+ * error is about something else.
+ */
+export function parseUndeclaredAppVariables(message: string): string[] | null {
+  const match = /app variables are not found in the agent'?s variables:?\s*(.*)$/i.exec(message);
+  if (!match) return null;
+  return match[1]
+    .split(",")
+    .map((name) => name.trim().replace(/[.'"]+$/g, "").replace(/^['"]+/g, ""))
+    .filter(Boolean);
+}
+
+function withoutVariables(
+  users: SarvamCohortUser[],
+  dropped: Set<string>,
+  dropAll: boolean
+): SarvamCohortUser[] {
+  return users.map((user) => {
+    if (!user.app_variables) return user;
+    const kept = dropAll
+      ? {}
+      : Object.fromEntries(
+          Object.entries(user.app_variables).filter(([key]) => !dropped.has(key))
+        );
+    const next: SarvamCohortUser = { ...user };
+    if (Object.keys(kept).length > 0) {
+      next.app_variables = kept;
+    } else {
+      delete next.app_variables;
+    }
+    return next;
+  });
+}
+
 /** Cohort names are limited to 50 characters of letters, digits, spaces, - and _ */
 function sanitizeCohortName(name: string): string {
   const cleaned = name.replace(/[^A-Za-z0-9 _-]/g, "").trim().slice(0, 50);
@@ -147,6 +184,8 @@ export async function streamSarvamCohort({
   let lastStatus = "processing";
   let streamedCount = 0;
   let providerRejected = 0;
+  const undeclaredVariables = new Set<string>();
+  let dropAllVariables = false;
 
   for (let i = 0; i < validCohortUsers.length; i += BATCH_SIZE) {
     const chunk = validCohortUsers.slice(i, i + BATCH_SIZE);
@@ -155,15 +194,35 @@ export async function streamSarvamCohort({
         ? sanitizeCohortName(`${baseName.slice(0, 40)} Part ${Math.floor(i / BATCH_SIZE) + 1}`)
         : baseName;
 
-    const payload: SarvamStreamCohortRequest = {
-      name: chunkName,
-      users: chunk,
+    const send = (users: SarvamCohortUser[]) => {
+      const payload: SarvamStreamCohortRequest = { name: chunkName, users };
+      return sarvamFetch<SarvamStreamCohortResponse>(path, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
     };
 
-    const response = await sarvamFetch<SarvamStreamCohortResponse>(path, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    let response: SarvamStreamCohortResponse;
+    try {
+      response = await send(withoutVariables(chunk, undeclaredVariables, dropAllVariables));
+    } catch (err) {
+      // The agent does not declare some variables we stream. Calls work
+      // without them (the agent just cannot personalise), so drop them and
+      // retry once rather than failing the launch.
+      const undeclared = parseUndeclaredAppVariables((err as Error).message || "");
+      if (undeclared === null || dropAllVariables) throw err;
+      if (undeclared.length > 0) {
+        undeclared.forEach((name) => undeclaredVariables.add(name));
+      } else {
+        dropAllVariables = true;
+      }
+      console.warn(
+        `Sarvam agent does not declare cohort variable(s) ${
+          undeclared.join(", ") || "(unspecified)"
+        }; streaming without them. Add them to the agent or adjust SARVAM_COHORT_VARIABLES.`
+      );
+      response = await send(withoutVariables(chunk, undeclaredVariables, dropAllVariables));
+    }
 
     lastCohortId = response.cohort_id;
     lastStatus = response.status || "processing";

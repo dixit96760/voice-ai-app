@@ -1,7 +1,7 @@
 import { buildSarvamAgentConfig } from "../lib/providers/sarvam/agent";
 import { normalizeCampaignWebhook } from "../lib/providers/sarvam/webhooks";
 import { buildCreateCampaignPayload } from "../lib/providers/sarvam/campaign";
-import { buildCohortUser } from "../lib/providers/sarvam/cohort";
+import { buildCohortUser, parseUndeclaredAppVariables } from "../lib/providers/sarvam/cohort";
 import { normalizeSarvamError, SarvamProviderError } from "../lib/providers/sarvam/errors";
 import { normalizeIndianPhone } from "../lib/validation/phone";
 import { isSarvamMockMode } from "../lib/providers/sarvam/client";
@@ -614,6 +614,25 @@ export function runSarvamTelephonyTests() {
     throw new Error("Both dialer numbers must be sent when rotation is enabled");
   }
   console.log("  OK. Agent phone rotation only activates with a multi-number pool");
+
+  // Undeclared-variable rejections are recognised so the cohort can be retried
+  // without those variables instead of failing the launch.
+  const undeclared = parseUndeclaredAppVariables(
+    "Invalid request payload: The following app variables are not found in the agent's variables: customer_name"
+  );
+  if (!undeclared || undeclared.join(",") !== "customer_name") {
+    throw new Error(`Expected undeclared variable customer_name, got ${JSON.stringify(undeclared)}`);
+  }
+  const undeclaredMany = parseUndeclaredAppVariables(
+    "The following app variables are not found in the agent's variables: customer_name, city"
+  );
+  if (!undeclaredMany || undeclaredMany.join(",") !== "customer_name,city") {
+    throw new Error("Multiple undeclared variables must all be parsed");
+  }
+  if (parseUndeclaredAppVariables("Invalid request payload: connection_id is required") !== null) {
+    throw new Error("Unrelated provider errors must not be treated as undeclared variables");
+  }
+  console.log("  OK. Undeclared agent variables are detected for a retry without them");
 
   // Cohort user records use the documented user_identifier/app_variables shape.
   const cohortUser = buildCohortUser(
