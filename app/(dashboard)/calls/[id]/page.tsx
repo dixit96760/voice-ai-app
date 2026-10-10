@@ -40,7 +40,13 @@ export default async function CallDetailPage({ params }: CallDetailPageProps) {
   const { call, contact, campaign, attempts, transcript, analysis, callback } = callData;
 
   // Retrieve temporary signed playback URL if call has a recording
-  const { signedUrl } = await getCallRecordingSignedUrl(call.id, business.id);
+  const recording = await getCallRecordingSignedUrl(call.id, business.id);
+  const recordingPending =
+    !recording.signedUrl &&
+    !recording.restricted &&
+    Boolean(call.provider_interaction_id) &&
+    (call.duration_seconds || 0) > 0 &&
+    Date.now() - new Date(call.created_at).getTime() < 7 * 24 * 60 * 60 * 1000;
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -163,16 +169,25 @@ export default async function CallDetailPage({ params }: CallDetailPageProps) {
         )}
       </div>
 
-      {/* Audio Playback Player */}
-      {signedUrl && (
+      {/* Audio Playback Player (owners and admins only) */}
+      {(recording.signedUrl || recording.restricted || recordingPending) && (
         <div className="space-y-1.5">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Call Audio Recording
           </h3>
-          <CallRecordingPlayer
-            signedUrl={signedUrl}
-            durationSeconds={call.duration_seconds}
-          />
+          {recording.signedUrl ? (
+            <CallRecordingPlayer
+              signedUrl={recording.signedUrl}
+              downloadUrl={recording.downloadUrl}
+              durationSeconds={recording.durationSeconds ?? call.duration_seconds}
+            />
+          ) : (
+            <p className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+              {recording.restricted
+                ? "Call recordings are available to the business owner and admins only."
+                : "The recording is being prepared and will appear here within a few minutes."}
+            </p>
+          )}
         </div>
       )}
 

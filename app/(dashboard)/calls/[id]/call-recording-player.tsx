@@ -1,15 +1,16 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Play, Pause, Volume2, VolumeX, RotateCcw } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, RotateCcw, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface CallRecordingPlayerProps {
   signedUrl: string;
+  downloadUrl?: string | null;
   durationSeconds?: number | null;
 }
 
-export function CallRecordingPlayer({ signedUrl, durationSeconds }: CallRecordingPlayerProps) {
+export function CallRecordingPlayer({ signedUrl, downloadUrl, durationSeconds }: CallRecordingPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -108,6 +109,20 @@ export function CallRecordingPlayer({ signedUrl, durationSeconds }: CallRecordin
         </div>
 
         <div className="flex items-center gap-1.5">
+          {downloadUrl && (
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="h-8 px-2 gap-1 text-[11px] text-muted-foreground"
+              title="Download recording"
+            >
+              <a href={downloadUrl} download>
+                <Download className="h-3.5 w-3.5" />
+                Download
+              </a>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

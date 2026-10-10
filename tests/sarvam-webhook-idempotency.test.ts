@@ -19,6 +19,24 @@ export class FakeDb {
     call_analysis: [["call_id"]],
     dnc_numbers: [["business_id", "phone_number"]],
   };
+  /** In-memory Supabase Storage: bucket -> path -> uploaded bytes. */
+  files = new Map<string, Map<string, number>>();
+  storage = {
+    from: (bucket: string) => {
+      if (!this.files.has(bucket)) this.files.set(bucket, new Map());
+      const objects = this.files.get(bucket)!;
+      return {
+        upload: async (path: string, body: ArrayBuffer) => {
+          objects.set(path, body.byteLength);
+          return { data: { path }, error: null };
+        },
+        remove: async (paths: string[]) => {
+          paths.forEach((p) => objects.delete(p));
+          return { data: paths, error: null };
+        },
+      };
+    },
+  };
   /** Table name whose next insert should fail, to simulate an outage. */
   failNextInsertInto: string | null = null;
   private nextId = 1;
@@ -82,6 +100,14 @@ class FakeQuery {
   }
   in(col: string, vals: unknown[]) {
     this.filters.push((r) => vals.includes(r[col]));
+    return this;
+  }
+  gt(col: string, val: string | number) {
+    this.filters.push((r) => {
+      const v = r[col];
+      if (v === null || v === undefined) return false;
+      return typeof val === "number" ? Number(v) > val : String(v) > String(val);
+    });
     return this;
   }
   neq(col: string, val: unknown) {

@@ -42,6 +42,7 @@ export interface CallDetailResult {
     short_summary: string | null;
     provider_call_id: string | null;
     provider_attempt_id: string | null;
+    provider_interaction_id: string | null;
     started_at: string | null;
     ended_at: string | null;
     created_at: string;
@@ -305,6 +306,7 @@ export async function getCallDetail(
       short_summary: call.short_summary,
       provider_call_id: call.provider_call_id,
       provider_attempt_id: call.provider_attempt_id,
+      provider_interaction_id: call.provider_interaction_id,
       started_at: call.started_at,
       ended_at: call.ended_at,
       created_at: call.created_at,

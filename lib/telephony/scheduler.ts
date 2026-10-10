@@ -5,6 +5,8 @@ import { buildAgentVariableValues } from "@/lib/providers/sarvam/cohort";
 import { buildTokenUrl, SARVAM_OUTBOUND_WEBHOOK_PATH } from "@/lib/providers/sarvam/config";
 import { buildCampaignBrief } from "@/lib/providers/sarvam/agent";
 import { quotaService } from "@/lib/billing/quota-service";
+import { archiveCallRecording } from "@/lib/calls/recording-archive";
+import { STORAGE_BUCKETS } from "@/lib/storage";
 import {
   PERMITTED_CALLING_END,
   PERMITTED_CALLING_START,
@@ -37,8 +39,17 @@ export interface SchedulerReport {
   campaignsCompleted: number;
   callbacksDialed: number;
   campaignsPurged: number;
+  recordingsArchived: number;
+  recordingsExpired: number;
   errors: string[];
 }
+
+/** Recordings copied per run; each is a ~1 MB/minute download and upload. */
+const MAX_RECORDINGS_ARCHIVED_PER_RUN = 5;
+/** Sarvam produces the recording shortly after the call ends. */
+const RECORDING_READY_DELAY_MS = 60 * 1000;
+/** Stop trying to fetch a recording after this long. */
+const RECORDING_ARCHIVE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Current IST wall-clock time as minutes since midnight and ISO weekday (1 = Monday). */
 export function istClock(now: Date): { minutes: number; weekday: number } {
@@ -313,6 +324,81 @@ export async function purgeRecycleBin(
   return purged?.length || 0;
 }
 
+/**
+ * Copies recordings of recently connected calls from Sarvam into the private
+ * call-recordings bucket, so owners can play them after Sarvam's copy expires.
+ */
+export async function archivePendingRecordings(
+  supabase: AdminClient,
+  now: Date,
+  errors: string[]
+): Promise<number> {
+  const { data: calls } = await supabase
+    .from("calls")
+    .select(
+      "id, business_id, provider_interaction_id, provider_attempt_id, duration_seconds, call_recordings(id)"
+    )
+    .not("provider_interaction_id", "is", null)
+    .gt("duration_seconds", 0)
+    .gte("created_at", new Date(now.getTime() - RECORDING_ARCHIVE_WINDOW_MS).toISOString())
+    .lte("created_at", new Date(now.getTime() - RECORDING_READY_DELAY_MS).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  const pending = (calls || []).filter((call) => {
+    const rows = (call as { call_recordings?: unknown }).call_recordings;
+    return !rows || (Array.isArray(rows) && rows.length === 0);
+  });
+
+  let archived = 0;
+  for (const call of pending.slice(0, MAX_RECORDINGS_ARCHIVED_PER_RUN)) {
+    try {
+      if ((await archiveCallRecording(call, supabase)) === "archived") archived++;
+    } catch (err) {
+      errors.push(`recording ${call.id}: ${(err as Error).message}`);
+    }
+  }
+  return archived;
+}
+
+/** Deletes recordings past their retention date (expires_at), file and record. */
+export async function purgeExpiredRecordings(
+  supabase: AdminClient,
+  now: Date,
+  errors: string[]
+): Promise<number> {
+  const { data: expired } = await supabase
+    .from("call_recordings")
+    .select("id, storage_path")
+    .lt("expires_at", now.toISOString())
+    .limit(100);
+  if (!expired?.length) return 0;
+
+  const stored = expired
+    .map((r) => r.storage_path)
+    .filter((path): path is string => Boolean(path) && !/^https?:\/\//.test(path));
+  if (stored.length) {
+    const { error } = await supabase.storage.from(STORAGE_BUCKETS.RECORDINGS).remove(stored);
+    if (error) {
+      errors.push(`recording purge: ${error.message}`);
+      return 0;
+    }
+  }
+
+  const { error } = await supabase
+    .from("call_recordings")
+    .delete()
+    .in(
+      "id",
+      expired.map((r) => r.id)
+    );
+  if (error) {
+    errors.push(`recording purge: ${error.message}`);
+    return 0;
+  }
+  return expired.length;
+}
+
 export async function runScheduledJobs(
   now = new Date(),
   client?: AdminClient
@@ -323,6 +409,15 @@ export async function runScheduledJobs(
   const campaignsCompleted = await completeFinishedCampaigns(supabase, now, errors);
   const callbacksDialed = await dialDueCallbacks(supabase, now, errors);
   const campaignsPurged = await purgeRecycleBin(supabase, now, errors);
+  const recordingsArchived = await archivePendingRecordings(supabase, now, errors);
+  const recordingsExpired = await purgeExpiredRecordings(supabase, now, errors);
 
-  return { campaignsCompleted, callbacksDialed, campaignsPurged, errors };
+  return {
+    campaignsCompleted,
+    callbacksDialed,
+    campaignsPurged,
+    recordingsArchived,
+    recordingsExpired,
+    errors,
+  };
 }

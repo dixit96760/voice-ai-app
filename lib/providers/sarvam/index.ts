@@ -17,7 +17,7 @@ import {
   listSarvamCampaigns,
 } from "./campaign";
 import { streamSarvamCohort, getSarvamCohort } from "./cohort";
-import { getSarvamCallRecording } from "./recordings";
+import { downloadSarvamRecording, type SarvamRecordingAudio } from "./recordings";
 import type {
   SarvamCampaignRequest,
   SarvamCampaignResponse,
@@ -26,7 +26,6 @@ import type {
   SarvamStatusUpdateResponse,
 } from "./types";
 import type { StreamCohortParams, StreamCohortResult } from "./cohort";
-import type { RecordingRetrievalResult } from "./recordings";
 
 /**
  * VoiceProvider Abstract Interface
@@ -45,7 +44,7 @@ export interface VoiceProvider {
   }): Promise<SarvamCampaignListResponse>;
   streamCohort(params: StreamCohortParams): Promise<StreamCohortResult>;
   getCohort(campaignId: string, cohortId: string): Promise<SarvamCohortResponse>;
-  getRecording(interactionId: string): Promise<RecordingRetrievalResult>;
+  downloadRecording(appId: string, interactionId: string): Promise<SarvamRecordingAudio | null>;
 }
 
 export const SarvamVoiceProvider: VoiceProvider = {
@@ -57,5 +56,5 @@ export const SarvamVoiceProvider: VoiceProvider = {
   listCampaigns: listSarvamCampaigns,
   streamCohort: streamSarvamCohort,
   getCohort: getSarvamCohort,
-  getRecording: getSarvamCallRecording,
+  downloadRecording: downloadSarvamRecording,
 };

@@ -1,93 +1,89 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthContext } from "@/lib/auth/permissions";
+import { STORAGE_BUCKETS } from "@/lib/storage";
+import { archiveCallRecording } from "./recording-archive";
+
+/** Recordings contain customers' voices, so only owners and admins can hear them. */
+const RECORDING_ROLES = new Set(["OWNER", "ADMIN"]);
+
+export interface CallRecordingAccess {
+  /** Temporary link for in-page playback. */
+  signedUrl: string | null;
+  /** Temporary link that downloads the file. */
+  downloadUrl: string | null;
+  durationSeconds: number | null;
+  /** The viewer's role may not access recordings. */
+  restricted: boolean;
+}
+
+const NONE: CallRecordingAccess = {
+  signedUrl: null,
+  downloadUrl: null,
+  durationSeconds: null,
+  restricted: false,
+};
 
 /**
- * Generates an authorized, time-limited signed URL for private call recording playback.
+ * Generates authorized, time-limited links to a call's recording for the
+ * business owner or an admin. Fetches the recording from Sarvam on demand if
+ * the scheduler has not archived it yet.
  */
 export async function getCallRecordingSignedUrl(
   callId: string,
   businessId: string,
   expiresInSeconds = 3600
-): Promise<{ signedUrl: string | null; durationSeconds: number | null }> {
-  const supabase = await createClient();
+): Promise<CallRecordingAccess> {
+  const context = await getAuthContext();
+  if (!context || context.businessId !== businessId) return NONE;
+  if (!RECORDING_ROLES.has(context.role)) return { ...NONE, restricted: true };
 
-  // 1. Verify call belongs to the business
+  // Row-level security confirms the call belongs to this business.
+  const supabase = await createClient();
   const { data: call } = await supabase
     .from("calls")
-    .select("id, provider_interaction_id, duration_seconds")
+    .select("id, business_id, provider_interaction_id, provider_attempt_id, duration_seconds")
     .eq("id", callId)
     .eq("business_id", businessId)
-    .single();
-
-  if (!call) {
-    return { signedUrl: null, durationSeconds: null };
-  }
-
-  // 2. Fetch recording reference
-  let { data: recording } = await supabase
-    .from("call_recordings")
-    .select("storage_path, duration_seconds")
-    .eq("call_id", callId)
     .maybeSingle();
+  if (!call) return NONE;
 
-  // On-demand lazy fetch if not yet persisted but provider_interaction_id exists
-  if ((!recording || !recording.storage_path) && call.provider_interaction_id) {
+  // Recordings live in a private bucket with no client access; the server
+  // signs links only after the checks above.
+  const admin = createAdminClient();
+  const loadRecording = () =>
+    admin
+      .from("call_recordings")
+      .select("storage_path, duration_seconds")
+      .eq("call_id", callId)
+      .maybeSingle();
+
+  let { data: recording } = await loadRecording();
+  if (!recording?.storage_path || /^https?:\/\//.test(recording.storage_path)) {
     try {
-      const { getSarvamCallRecording } = await import(
-        "@/lib/providers/sarvam/recordings"
-      );
-      const providerRec = await getSarvamCallRecording(
-        call.provider_interaction_id
-      );
-      if (providerRec.recordingUrl) {
-        const { data: upserted } = await supabase
-          .from("call_recordings")
-          .upsert(
-            {
-              call_id: callId,
-              provider_recording_id: call.provider_interaction_id,
-              storage_path: providerRec.recordingUrl,
-              duration_seconds:
-                providerRec.durationSeconds || call.duration_seconds || 0,
-              mime_type: providerRec.mimeType || "audio/wav",
-              available_at: new Date().toISOString(),
-              created_at: new Date().toISOString(),
-            },
-            { onConflict: "call_id" }
-          )
-          .select("storage_path, duration_seconds")
-          .single();
-        if (upserted) {
-          recording = upserted;
-        }
-      }
-    } catch {
-      // Fallback gracefully if Sarvam recording is not yet ready or unavailable
+      const outcome = await archiveCallRecording(call, admin);
+      if (outcome === "archived") ({ data: recording } = await loadRecording());
+    } catch (err) {
+      console.error("On-demand recording archive failed:", err);
     }
   }
 
-  if (!recording || !recording.storage_path) {
-    return { signedUrl: null, durationSeconds: null };
+  if (!recording?.storage_path || /^https?:\/\//.test(recording.storage_path)) {
+    return NONE;
   }
 
-  // If storage path is already an external HTTP/HTTPS URL
-  if (recording.storage_path.startsWith("http://") || recording.storage_path.startsWith("https://")) {
-    return {
-      signedUrl: recording.storage_path,
-      durationSeconds: recording.duration_seconds,
-    };
-  }
-
-  // Generate signed URL from private Supabase bucket
-  const { data, error } = await supabase.storage
-    .from("call-recordings")
-    .createSignedUrl(recording.storage_path, expiresInSeconds);
-
-  if (error || !data) {
-    return { signedUrl: null, durationSeconds: recording.duration_seconds };
-  }
+  const bucket = admin.storage.from(STORAGE_BUCKETS.RECORDINGS);
+  const [play, download] = await Promise.all([
+    bucket.createSignedUrl(recording.storage_path, expiresInSeconds),
+    bucket.createSignedUrl(recording.storage_path, expiresInSeconds, {
+      download: `call-${callId}.${recording.storage_path.split(".").pop() || "wav"}`,
+    }),
+  ]);
 
   return {
-    signedUrl: data.signedUrl,
-    durationSeconds: recording.duration_seconds,
+    signedUrl: play.data?.signedUrl ?? null,
+    downloadUrl: download.data?.signedUrl ?? null,
+    durationSeconds: recording.duration_seconds ?? call.duration_seconds,
+    restricted: false,
   };
 }
