@@ -9,6 +9,7 @@ import {
   campaignCallingRulesSchema,
   CampaignReadinessResult,
   CAMPAIGN_TIMEZONE,
+  DEFAULT_CALLING_DAYS,
 } from "@/lib/validation/campaign";
 import { validateCampaignReadiness } from "./validator";
 import { redirect } from "next/navigation";
@@ -16,6 +17,7 @@ import { revalidatePath } from "next/cache";
 import type { Campaign, CampaignSource } from "./types";
 import type { Json } from "@/lib/supabase/types";
 import { launchCampaignExecution } from "@/lib/telephony/launch-service";
+import { syncSarvamCampaignSchedule } from "@/lib/telephony/sarvam-schedule-sync";
 import { SarvamVoiceProvider } from "@/lib/providers/sarvam";
 import { quotaService } from "@/lib/billing/quota-service";
 
@@ -70,7 +72,7 @@ export async function createCampaignDraftAction(
       description: validation.data.description,
       status: "DRAFT",
       timezone: CAMPAIGN_TIMEZONE,
-      calling_days: [1, 2, 3, 4, 5, 6],
+      calling_days: DEFAULT_CALLING_DAYS,
       calling_start_time: "10:00:00",
       calling_end_time: "18:30:00",
       max_attempts: 3,
@@ -443,7 +445,7 @@ export async function updateCallingRulesAction(
 
   const callingDaysRaw = formData.getAll("callingDays").map(Number);
   const rawData = {
-    callingDays: callingDaysRaw.length > 0 ? callingDaysRaw : [1, 2, 3, 4, 5, 6],
+    callingDays: callingDaysRaw,
     callingStartTime: (formData.get("callingStartTime") as string) || "10:00",
     callingEndTime: (formData.get("callingEndTime") as string) || "18:30",
     timezone: CAMPAIGN_TIMEZONE,
@@ -462,6 +464,21 @@ export async function updateCallingRulesAction(
   }
 
   const supabase = await createClient();
+
+  const { data: existing } = await supabase
+    .from("campaigns")
+    .select("status, sarvam_campaign_id")
+    .eq("id", campaignId)
+    .eq("business_id", business.id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!existing) {
+    return { error: "Campaign not found." };
+  }
+  // Sarvam only accepts schedule changes while a campaign is paused.
+  if (existing.status === "RUNNING") {
+    return { error: "Pause the campaign before changing its calling days or hours." };
+  }
 
   const { error } = await supabase
     .from("campaigns")
@@ -483,7 +500,36 @@ export async function updateCallingRulesAction(
     return { error: "Failed to update calling rules." };
   }
 
+  // A campaign that already reached Sarvam keeps the schedule it was created
+  // with unless it is updated there too.
+  if (existing.sarvam_campaign_id) {
+    try {
+      const sync = await syncSarvamCampaignSchedule(existing.sarvam_campaign_id, {
+        calling_days: validation.data.callingDays,
+        calling_start_time: `${validation.data.callingStartTime}:00`,
+        calling_end_time: `${validation.data.callingEndTime}:00`,
+        timezone: validation.data.timezone,
+      });
+      if (sync.outcome === "finished") {
+        // It will never dial again; the next launch creates a new one.
+        await supabase
+          .from("campaigns")
+          .update({ sarvam_campaign_id: null, sarvam_cohort_id: null })
+          .eq("id", campaignId)
+          .eq("business_id", business.id);
+      }
+    } catch (err: unknown) {
+      console.error("Calling schedule sync to Sarvam failed:", err);
+      revalidatePath(`/campaigns/${campaignId}/edit`);
+      return {
+        error:
+          "Calling rules were saved, but Sarvam could not be updated yet. They will be sent again when you launch or resume the campaign.",
+      };
+    }
+  }
+
   revalidatePath(`/campaigns/${campaignId}/edit`);
+  revalidatePath(`/campaigns/${campaignId}`);
   return { success: true, message: "Calling rules updated." };
 }
 
@@ -858,7 +904,7 @@ export async function resumeCampaignAction(
 
   const { data: campaign } = await supabase
     .from("campaigns")
-    .select("id, status, sarvam_campaign_id")
+    .select("id, status, sarvam_campaign_id, calling_days, calling_start_time, calling_end_time, timezone")
     .eq("id", campaignId)
     .eq("business_id", business.id)
     .single();
@@ -873,12 +919,20 @@ export async function resumeCampaignAction(
     };
   }
 
-  // Call Sarvam resume API if provider campaign exists
+  // Push any calling days/hours changed while paused, then resume on Sarvam.
   if (campaign.sarvam_campaign_id) {
     try {
+      const sync = await syncSarvamCampaignSchedule(campaign.sarvam_campaign_id, campaign);
+      if (sync.outcome === "finished") {
+        return {
+          error:
+            "This campaign has already finished on Sarvam. Mark it ready and launch it again to start a new run.",
+        };
+      }
       await SarvamVoiceProvider.resumeCampaign(campaign.sarvam_campaign_id);
     } catch (err: unknown) {
-      console.warn("Failed to resume Sarvam provider campaign:", err);
+      console.error("Failed to resume Sarvam provider campaign:", err);
+      return { error: `Could not resume the campaign on Sarvam: ${(err as Error).message}` };
     }
   }
 

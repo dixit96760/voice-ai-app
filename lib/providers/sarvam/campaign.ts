@@ -15,6 +15,7 @@ import {
   SarvamCampaignListResponse,
   SarvamCampaignRequest,
   SarvamCampaignResponse,
+  SarvamCampaignSchedule,
   SarvamCampaignStatusAction,
   SarvamCreateCampaignPayload,
   SarvamStatusUpdateRequest,
@@ -54,7 +55,19 @@ function toAllowedDays(days: number[] | undefined): string[] {
     .map((day) => DAY_NAMES[day - 1])
     .filter((name): name is (typeof DAY_NAMES)[number] => Boolean(name));
 
-  return mapped.length > 0 ? Array.from(new Set(mapped)) : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  return mapped.length > 0 ? Array.from(new Set(mapped)) : [...DAY_NAMES];
+}
+
+/** Sarvam's allowed_schedule from our campaign schedule (days 1 = Monday ... 7 = Sunday). */
+export function buildAllowedSchedule(
+  schedule: Partial<SarvamCampaignSchedule> | undefined
+): SarvamAllowedSchedule {
+  return {
+    allowed_start_time: toHhMm(schedule?.start_time, DEFAULT_START_TIME),
+    allowed_end_time: toHhMm(schedule?.end_time, DEFAULT_END_TIME),
+    allowed_days: toAllowedDays(schedule?.allowed_days),
+    timezone: schedule?.timezone || "Asia/Kolkata",
+  };
 }
 
 function toE164(value: string | null | undefined, label: string): string {
@@ -138,12 +151,7 @@ export function buildCreateCampaignPayload(
     );
   }
 
-  const allowedSchedule: SarvamAllowedSchedule = {
-    allowed_start_time: toHhMm(params.schedule?.start_time, DEFAULT_START_TIME),
-    allowed_end_time: toHhMm(params.schedule?.end_time, DEFAULT_END_TIME),
-    allowed_days: toAllowedDays(params.schedule?.allowed_days),
-    timezone: params.schedule?.timezone || "Asia/Kolkata",
-  };
+  const allowedSchedule = buildAllowedSchedule(params.schedule);
 
   const webhook = params.webhook || params.app_config?.webhook_config;
   const agentPhoneRotation =
@@ -273,6 +281,25 @@ export async function cancelSarvamCampaign(
  * Retrieves status and details of a Sarvam campaign.
  * Endpoint: GET /api/scheduling/v1/orgs/:org_id/workspaces/:workspace_id/campaigns/:campaign_id
  */
+/**
+ * Replaces a campaign's calling days and hours on Sarvam.
+ * Endpoint: PATCH /api/scheduling/v1/orgs/:org_id/workspaces/:workspace_id/campaigns/:campaign_id
+ * Sarvam only accepts this while the campaign is paused or scheduled.
+ */
+export async function updateSarvamCampaignSchedule(
+  sarvamCampaignId: string,
+  schedule: Partial<SarvamCampaignSchedule>
+): Promise<SarvamCampaignResponse> {
+  getSarvamScope();
+  return sarvamFetch<SarvamCampaignResponse>(
+    schedulingPath(`/${encodeURIComponent(sarvamCampaignId)}`),
+    {
+      method: "PATCH",
+      body: JSON.stringify({ allowed_schedule: buildAllowedSchedule(schedule) }),
+    }
+  );
+}
+
 export async function getSarvamCampaign(
   sarvamCampaignId: string
 ): Promise<SarvamCampaignResponse> {

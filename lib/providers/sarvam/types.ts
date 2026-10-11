@@ -20,7 +20,7 @@ export interface SarvamAgentConfig {
 export interface SarvamCampaignSchedule {
   start_time: string; // "HH:MM" or "HH:MM:SS"
   end_time: string;
-  allowed_days: number[]; // e.g. [1, 2, 3, 4, 5, 6] (Mon-Sat)
+  allowed_days: number[]; // 1 = Monday ... 7 = Sunday
   timezone: string; // e.g. "Asia/Kolkata"
 }
 

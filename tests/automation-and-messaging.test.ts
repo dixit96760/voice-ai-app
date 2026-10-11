@@ -8,6 +8,9 @@ import {
   purgeRecycleBin,
 } from "../lib/telephony/scheduler";
 import { toCampaignPayload } from "../lib/telephony/outbound-webhook";
+import { syncSarvamCampaignSchedule } from "../lib/telephony/sarvam-schedule-sync";
+import { buildAllowedSchedule } from "../lib/providers/sarvam/campaign";
+import { campaignCallingRulesSchema, DEFAULT_CALLING_DAYS } from "../lib/validation/campaign";
 import { buildBusinessDetailsMessage } from "../lib/messaging/business-details";
 import { sendBusinessDetails } from "../lib/messaging/send-business-details";
 
@@ -274,7 +277,75 @@ export async function runAutomationAndMessagingTests() {
     restore("SARVAM_MOCK_MODE", savedEnv.mock);
   }
 
-  // 7. Recycle bin purge keeps recent and running campaigns
+  // 7. Calling days: Sunday is supported, empty selections are rejected, and
+  //    edits reach an existing Sarvam campaign.
+  assert.deepEqual(DEFAULT_CALLING_DAYS, [1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(buildAllowedSchedule({ allowed_days: [6, 7] }).allowed_days, ["Saturday", "Sunday"]);
+  assert.equal(buildAllowedSchedule({ allowed_days: [] }).allowed_days.length, 7);
+  assert.equal(
+    campaignCallingRulesSchema.safeParse({ callingDays: [], callingStartTime: "10:00", callingEndTime: "18:00" }).success,
+    false
+  );
+  assert.equal(
+    campaignCallingRulesSchema.safeParse({ callingDays: [7], callingStartTime: "10:00", callingEndTime: "18:00" }).success,
+    true
+  );
+
+  const syncEnv = {
+    org: process.env.SARVAM_ORG_ID,
+    ws: process.env.SARVAM_WORKSPACE_ID,
+    key: process.env.SARVAM_VOICE_AGENTS_API_KEY,
+    mock: process.env.SARVAM_MOCK_MODE,
+  };
+  const syncFetchBefore = globalThis.fetch;
+  try {
+    process.env.SARVAM_ORG_ID = "org-test";
+    process.env.SARVAM_WORKSPACE_ID = "ws-test";
+    process.env.SARVAM_VOICE_AGENTS_API_KEY = "sk_test_schedule";
+    process.env.SARVAM_MOCK_MODE = "false";
+
+    let remoteStatus = "active";
+    const calls: Array<{ method: string; url: string; body: unknown }> = [];
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      const method = init?.method || "GET";
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      calls.push({ method, url: String(url), body });
+      if (method === "PUT") remoteStatus = (body as { action: string }).action === "pause" ? "paused" : remoteStatus;
+      return new Response(JSON.stringify({ campaign_id: "camp_x", status: remoteStatus }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const campaignSchedule = {
+      calling_days: [1, 2, 3, 4, 5, 6, 7],
+      calling_start_time: "10:00:00",
+      calling_end_time: "18:30:00",
+      timezone: "Asia/Kolkata",
+    };
+    const synced = await syncSarvamCampaignSchedule("camp_x", campaignSchedule);
+    assert.deepEqual(synced, { outcome: "synced", remoteStatus: "paused" });
+    assert.deepEqual(calls.map((c) => c.method), ["GET", "PUT", "PATCH"]);
+    const patched = calls[2].body as { allowed_schedule: { allowed_days: string[]; allowed_start_time: string } };
+    assert.ok(patched.allowed_schedule.allowed_days.includes("Sunday"));
+    assert.equal(patched.allowed_schedule.allowed_start_time, "10:00");
+
+    calls.length = 0;
+    remoteStatus = "ended";
+    assert.deepEqual(await syncSarvamCampaignSchedule("camp_x", campaignSchedule), { outcome: "finished" });
+    assert.deepEqual(calls.map((c) => c.method), ["GET"]);
+    console.log("  ✅ Calling days (incl. Sunday) are pushed to Sarvam; finished campaigns start a fresh run");
+  } finally {
+    globalThis.fetch = syncFetchBefore;
+    const restore = (key: string, value: string | undefined) =>
+      value === undefined ? delete process.env[key] : (process.env[key] = value);
+    restore("SARVAM_ORG_ID", syncEnv.org);
+    restore("SARVAM_WORKSPACE_ID", syncEnv.ws);
+    restore("SARVAM_VOICE_AGENTS_API_KEY", syncEnv.key);
+    restore("SARVAM_MOCK_MODE", syncEnv.mock);
+  }
+
+  // 8. Recycle bin purge keeps recent and running campaigns
   const purgeDb = new FakeDb();
   const now = new Date("2026-10-08T06:00:00Z");
   purgeDb.rows("campaigns").push(

@@ -19,6 +19,7 @@ import {
   CAMPAIGN_INDUSTRIES,
   SUPPORTED_LANGUAGES,
   CampaignReadinessResult,
+  DEFAULT_CALLING_DAYS,
 } from "@/lib/validation/campaign";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -955,7 +956,7 @@ export default function CampaignWizard({
                     { day: 6, label: "Sat" },
                     { day: 7, label: "Sun" },
                   ].map((d) => {
-                    const isChecked = (campaign.calling_days || [1, 2, 3, 4, 5, 6]).includes(
+                    const isChecked = (campaign.calling_days || DEFAULT_CALLING_DAYS).includes(
                       d.day
                     );
                     return (

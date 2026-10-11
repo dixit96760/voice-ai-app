@@ -6,8 +6,10 @@ import { buildTokenUrl, SARVAM_OUTBOUND_WEBHOOK_PATH } from "@/lib/providers/sar
 import { buildCampaignBrief } from "@/lib/providers/sarvam/agent";
 import { quotaService } from "@/lib/billing/quota-service";
 import { archiveCallRecording } from "@/lib/calls/recording-archive";
+import { FINISHED_SARVAM_STATUSES } from "./sarvam-schedule-sync";
 import { STORAGE_BUCKETS } from "@/lib/storage";
 import {
+  DEFAULT_CALLING_DAYS,
   PERMITTED_CALLING_END,
   PERMITTED_CALLING_START,
   toMinutes,
@@ -17,15 +19,6 @@ import type { Database } from "@/lib/supabase/types";
 type AdminClient = ReturnType<typeof createAdminClient>;
 type Campaign = Database["public"]["Tables"]["campaigns"]["Row"];
 
-/** Sarvam campaign states after which no more calls will be placed. */
-const FINISHED_SARVAM_STATUSES = new Set([
-  "ended",
-  "completed",
-  "cancelled",
-  "canceled",
-  "expired",
-  "finished",
-]);
 
 const RECYCLE_BIN_DAYS = 30;
 const MAX_CALLBACK_DIAL_ATTEMPTS = 3;
@@ -86,7 +79,7 @@ export function isWithinCallingWindow(
     toMinutes(PERMITTED_CALLING_END),
     campaign?.calling_end_time ? toMinutes(campaign.calling_end_time.slice(0, 5)) : 24 * 60
   );
-  const days = campaign?.calling_days?.length ? campaign.calling_days : [1, 2, 3, 4, 5, 6];
+  const days = campaign?.calling_days?.length ? campaign.calling_days : DEFAULT_CALLING_DAYS;
   return minutes >= start && minutes < end && days.includes(weekday);
 }
 

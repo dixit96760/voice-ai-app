@@ -132,6 +132,8 @@ export type CampaignAiBehaviorInput = z.infer<typeof campaignAiBehaviorSchema>;
 export const PERMITTED_CALLING_START = "09:00";
 export const PERMITTED_CALLING_END = "21:00";
 export const CAMPAIGN_TIMEZONE = "Asia/Kolkata";
+/** Calling days, 1 = Monday ... 7 = Sunday. New campaigns may call every day. */
+export const DEFAULT_CALLING_DAYS = [1, 2, 3, 4, 5, 6, 7];
 
 export function toMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);

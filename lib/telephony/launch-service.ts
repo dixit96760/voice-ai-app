@@ -7,7 +7,9 @@ import {
 import { buildCampaignBrief, buildSarvamAgentConfig } from "@/lib/providers/sarvam/agent";
 import { validateCampaignReadiness } from "@/lib/campaign/validator";
 import { normalizeIndianPhone } from "@/lib/validation/phone";
+import { DEFAULT_CALLING_DAYS } from "@/lib/validation/campaign";
 import { quotaService } from "@/lib/billing/quota-service";
+import { syncSarvamCampaignSchedule } from "./sarvam-schedule-sync";
 import type { Database } from "@/lib/supabase/types";
 
 type Campaign = Database["public"]["Tables"]["campaigns"]["Row"];
@@ -293,6 +295,25 @@ export async function launchCampaignExecution(
 
   // 11. Create or Reuse Sarvam Campaign
   let sarvamCampaignId = campaign.sarvam_campaign_id;
+  // When relaunching a campaign that already reached Sarvam (e.g. paused,
+  // edited and marked ready again), reuse it: push the current calling days
+  // and hours, skip re-uploading contacts it already has, and resume it.
+  let reusedRemoteStatus: string | null = null;
+
+  if (sarvamCampaignId) {
+    try {
+      const sync = await syncSarvamCampaignSchedule(sarvamCampaignId, campaign as Campaign);
+      if (sync.outcome === "finished") {
+        sarvamCampaignId = null; // ended on Sarvam: start a fresh run below
+      } else {
+        reusedRemoteStatus = sync.remoteStatus;
+      }
+    } catch (err: unknown) {
+      return abortLaunch(
+        `Failed to update the calling schedule on Sarvam: ${(err as Error).message}`
+      );
+    }
+  }
 
   if (!sarvamCampaignId) {
     try {
@@ -307,7 +328,7 @@ export async function launchCampaignExecution(
         schedule: {
           start_time: campaign.calling_start_time,
           end_time: campaign.calling_end_time,
-          allowed_days: campaign.calling_days || [1, 2, 3, 4, 5, 6],
+          allowed_days: campaign.calling_days || DEFAULT_CALLING_DAYS,
           timezone: campaign.timezone || "Asia/Kolkata",
         },
         retry_policy: {
@@ -339,32 +360,47 @@ export async function launchCampaignExecution(
       .eq("id", campaignId);
   }
 
-  // 12. Stream Cohort of Eligible Contacts
+  // 12. Stream Cohort of Eligible Contacts (once per Sarvam campaign; a
+  //     relaunch must not queue the same contacts again)
   let cohortId = "";
-  try {
-    const cohortResult = await SarvamVoiceProvider.streamCohort({
-      sarvamCampaignId,
-      cohortName: `${campaign.name} Cohort`,
-      contacts: eligibleContacts,
-      campaignOffering: campaign.offering_type || undefined,
-      businessName: business.business_name,
-      campaignObjective: campaign.objective || undefined,
-      campaignId,
-      campaignBrief: buildCampaignBrief({
-        business,
-        campaign: campaign as Campaign,
-        sources: (sources || []) as CampaignSource[],
-      }),
-      appVariables: Array.isArray(
-        (activeVersion.configuration as Record<string, unknown> | null)?.appVariables
-      )
-        ? ((activeVersion.configuration as Record<string, unknown>).appVariables as string[])
-        : undefined,
-    });
+  const contactsAlreadyQueued = Boolean(reusedRemoteStatus && campaign.sarvam_cohort_id);
+  if (contactsAlreadyQueued) {
+    cohortId = campaign.sarvam_cohort_id!;
+  } else {
+    try {
+      const cohortResult = await SarvamVoiceProvider.streamCohort({
+        sarvamCampaignId,
+        cohortName: `${campaign.name} Cohort`,
+        contacts: eligibleContacts,
+        campaignOffering: campaign.offering_type || undefined,
+        businessName: business.business_name,
+        campaignObjective: campaign.objective || undefined,
+        campaignId,
+        campaignBrief: buildCampaignBrief({
+          business,
+          campaign: campaign as Campaign,
+          sources: (sources || []) as CampaignSource[],
+        }),
+        appVariables: Array.isArray(
+          (activeVersion.configuration as Record<string, unknown> | null)?.appVariables
+        )
+          ? ((activeVersion.configuration as Record<string, unknown>).appVariables as string[])
+          : undefined,
+      });
 
-    cohortId = cohortResult.cohortId;
-  } catch (err: unknown) {
-    return abortLaunch(`Failed to stream contacts cohort to Sarvam: ${(err as Error).message}`);
+      cohortId = cohortResult.cohortId;
+    } catch (err: unknown) {
+      return abortLaunch(`Failed to stream contacts cohort to Sarvam: ${(err as Error).message}`);
+    }
+  }
+
+  // A reused Sarvam campaign that is paused must be resumed to start dialling.
+  if (reusedRemoteStatus === "paused") {
+    try {
+      await SarvamVoiceProvider.resumeCampaign(sarvamCampaignId);
+    } catch (err: unknown) {
+      return abortLaunch(`Failed to resume the campaign on Sarvam: ${(err as Error).message}`);
+    }
   }
 
   // 13. Update Database: Set Campaign to RUNNING
